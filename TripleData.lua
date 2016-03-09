@@ -28,10 +28,18 @@ function isColorImage(img)
     return img:size(1) == 3 and img:dim() == 3
 end
 
+function LoadNormalizedResolutionImage(filename)
+    print ("loading..." .. filename)
+    local imagepath = imagePath .. filename
+    return preprocess(imagepath)
+end
+
 function GenerateListTriplets(db, size)
     print ("generate list triplets", size)
+    --print ("data", db)
     local data = db.data
-    local list = torch.IntTensor(size,3)
+    --local list = torch.IntTensor(size,3)
+    local list = {}
     -- print ("generate db: ", db)
     -- print ("Generate List Triplet data:", db)
     -- print ("anchor_name_list:", data.anchor_name_list)
@@ -67,10 +75,14 @@ function GenerateListTriplets(db, size)
             negative_name = neg_of_anchor[n3]
         end
 
+        --print(anchor_name, negative_name, positive_name)
+       
+        local exemplar = {anchor_name, negative_name, positive_name}
+        table.insert(list, exemplar)
 
-        list[i][1] = db.imagepoolbyname[anchor_name]
-        list[i][3] = db.imagepoolbyname[positive_name]
-        list[i][2] = db.imagepoolbyname[negative_name]
+        --list[i][1] = anchor_name
+        --list[i][2] = negative_name
+        --list[i][3] = positive_name
 
         if list[i][1] == list[i][3] then
             print("same index", positive_name, anchor_name)
@@ -109,10 +121,6 @@ if path.exists(save_filename) ~= false then
     return Data
 end
 
-function LoadNormalizedResolutionImage(filename)
-    local imagepath = imagePath .. filename
-    return preprocess(imagepath)
-end
 --function LoadNormalizedResolutionImage(filename)
 --    local imagepath = imagePath .. filename
 --
@@ -161,8 +169,7 @@ function LoadData(filepath)
 
     label_pairs = csvigo.load( {path=DataPath .. filepath, mode='large'} )
 
-    for i=1,#label_pairs,3 do
-    --for i=1,#label_pairs,10000 do
+    for i=1,#label_pairs do
         m = label_pairs[i]
         local a_name = m[2]
         local t_name = m[3]
@@ -176,9 +183,8 @@ function LoadData(filepath)
             if ImagePoolByName[a_name] == nil then
                 local img = LoadNormalizedResolutionImage(a_name)
                 if isColorImage(img) then
-                    table.insert(ImagePool,img)
                     count_imagepool = count_imagepool + 1
-                    ImagePoolByName[a_name] = count_imagepool
+                    ImagePoolByName[a_name] = true
                 else
                     --print("ancnor continue")
                     bcontinue = true
@@ -187,9 +193,8 @@ function LoadData(filepath)
             if ImagePoolByName[t_name] == nil then
                 local img = LoadNormalizedResolutionImage(t_name)
                 if isColorImage(img) then
-                    table.insert(ImagePool,img)
                     count_imagepool = count_imagepool + 1
-                    ImagePoolByName[t_name] = count_imagepool
+                    ImagePoolByName[t_name] = true
                 else
                     --print("positive continue")
                     bcontinue = true
@@ -230,8 +235,6 @@ function LoadData(filepath)
     Data.data.anchor_name_list = anchor_name_list
     Data.data.positive = positive_pairs
     Data.data.negative = negative_pairs
-    Data.imagepool = ImagePool
-    Data.imagepoolbyname = ImagePoolByName
 
     return Data
 end
@@ -268,15 +271,13 @@ function SplitData(Data)
     TrainData.data.anchor_name_list = train_anchor_name_list
     TrainData.data.positive = Data.data.positive
     TrainData.data.negative = Data.data.negative
-    TrainData.imagepool = Data.imagepool
-    TrainData.imagepoolbyname = Data.imagepoolbyname
+    TrainData.Resolution = {3, 299, 299}
 
     TestData.data.anchor_name_list = test_anchor_name_list
     TestData.data.anchor_name_to_idx = Data.data.anchor_name_to_idx
     TestData.data.positive = Data.data.positive
     TestData.data.negative = Data.data.negative
-    TestData.imagepool = Data.imagepool
-    TestData.imagepoolbyname = Data.imagepoolbyname
+    TestData.Resolution = {3, 299, 299}
 
     return TrainData, TestData
 end

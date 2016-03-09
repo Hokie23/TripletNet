@@ -1,7 +1,9 @@
 require 'torch'
 require 'dok'
 
+
 require 'image'
+local thread = require 'threads'
 local DataContainer = torch.class('DataContainer')
 
 local function CatNumSize(num,size)
@@ -24,9 +26,15 @@ function DataContainer:__init(...)
     {arg='Data', type='userdata', help='Data', req = true},
     {arg='ListGenFunc', type='function', help='Generate new list'},
     {arg='Augment', type='boolean', help='augment data',default=false},
-    {arg='BulkImage', type='boolean', help='how to load bulk of list', default=false}
+    {arg='BulkImage', type='boolean', help='how to load bulk of list', default=false},
+    {arg='Resolution', type='number', help='how to load bulk of list', req=true},
+    {arg='LoadImageFunc', type='function', help='how to load bulk of list', req = true}
     )
 
+    print ("list:", args.List[1])
+    print ("list size:", #args.List[1])
+
+    --self.CurrentItemMutex = thread.Mutex()
     self.BatchSize = args.BatchSize
     self.TensorType = args.TensorType
     self.ExtractFunction = args.ExtractFunction
@@ -35,8 +43,10 @@ function DataContainer:__init(...)
     self.Data = args.Data
     self.List = args.List
     self.ListGenFunc = args.ListGenFunc
-    self.NumEachSet = self.List:size(2)
+    self.NumEachSet = #self.List[1]
     self.BulkImage = args.BulkImage
+    self.Resolution = args.Resolution
+    self.LoadImageFunc = args.LoadImageFunc
     self:Reset()
 end
 
@@ -45,7 +55,7 @@ function DataContainer:Reset()
 end
 
 function DataContainer:size()
-    return self.List:size(1)
+    return #self.List
 end
 
 function DataContainer:Reset()
@@ -74,78 +84,57 @@ function DataContainer:GenerateList()
     self.List = self.ListGenFunc()
 end
 
-function DataContainer:GetNextBatch()
-    local size = math.min(self:size()-self.CurrentItem + 1, self.BatchSize )
-    if size <= 0 then
-        return nil
-    end
-
-    if self.Batch:dim() == 0 then
-        local nsz
-        nsz = CatNumSize(self.NumEachSet, CatNumSize(size, self.Data[1]:size()))
-        -- print ("self.Batch:resize", nsz)
-        self.Batch:resize(nsz)
-    elseif size ~= self.Batch:size(1) then
-        local nsz
-        nsz = CatNumSize(self.NumEachSet, CatNumSize(size, self.Data[1]:size()))
-        -- print ("self.Batch:resize", nsz)
-        self.Batch:resize(nsz)
-    end
-    local batch_table = {}
-    if self.BulkImage then
-        for i=1, self.NumEachSet do
-            --print ( self.List[{{self.CurrentItem,self.CurrentItem+size-1},i}]:long())
-            local d = self.Data:index(1,self.List[{{self.CurrentItem,self.CurrentItem+size-1},i}]:long())
-            self.Batch[i]:copy(d)
-        end
-    else
-        -- print ("self.Data=",self.Data)
-        for i=1, self.NumEachSet do
-            local mylist = self.List[{{self.CurrentItem,self.CurrentItem+size-1},i}]:long()
-            for j=1,mylist:size(1) do
-                local d = self.Data[mylist[j]]
-                if d:size(1) == 4 then
-                    self.Batch[i][j]:copy(d[{{1,3}}])
-                else
-                   -- print ("batch", self.Batch:size())
-                   -- print ("d:size()=", d:size())
-                   -- print ("index=", i, j)
-                   -- print ("list:size()=", mylist:size(1))
-                   -- print ("size=", size)
-                    local status, err = pcall(self.Batch[i][j]:copy(d))
-                end
-            end
+function DataContainer:LoadBatch(batchlist)
+    local batch = torch.Tensor():type(self.TensorType)
+    local size = #mylist
+    nsz = CatNumSize(self.NumEachSet, CatNumSize(size,  self.Resolution))
+    batch:resize(nsz)
+    for i=1, self.NumEachSet do
+        mylist = batchlist[{{i},{}}]
+        for j=1,mylist:size(1) do
+            local filename = mylist[j]
+            local img = self.LoadImageFunc(filename)
+            local status, err = pcall(self.Batch[i][j]:copy(img))
         end
     end
 
-    --print ("batch size:", self.Batch[1]:size())
-    local side = self.Batch[1]:size(3)
-    if self.Augment then
-        for l=1,self.NumEachSet do
-            for i=1,size do
-                local sz = math.random(side/4 + 1) - 1
-                local hflip = math.random(2)==1
+    return batch
+end
 
-                local startx = math.random(sz) 
-                local starty = math.random(sz) 
-                local img = self.Batch[l][i]:narrow(2,starty,side-sz):narrow(3,startx,side-sz):float()
-                if hflip then
-                    img = image.hflip(img)
-                end
-                img = image.scale(img,side,side)
-                self.Batch[l][i]:copy(img)
-            end
-        end
+function DataContainer:IsContinue()
+    if self.CurrentItem <= #self.List then
+        return true
     end
-    local list = self.List[{{self.CurrentItem,self.CurrentItem+size-1},i}]:long()
-    self.CurrentItem = self.CurrentItem + size
-    return self.Batch, list
+
+    return false
+end
+
+function DataContainer:Lock()
+    --self.CurrentItemMutex.lock()
+end
+
+function DataContainer:Unlock()
+    --self.CurrentItemMutex.unlock()
 end
 
 
+function DataContainer:GetNextBatch()
+    print ("begin--")
+    self:Lock()
+    local size = math.min(self:size()-self.CurrentItem + 1, self.BatchSize)
+    if size <= 0 then
+        self:Unlock()
+        return nil
+    end
 
+    local mylist = {}
+    for i=0,(size-1) do
+        table.insert(mylist,self.List[self.CurrentItem+i])
+    end
+    print ("mylist: ", #mylist)
+    self.CurrentItem = self.CurrentItem + size
+    self:Unlock()
 
-
-
-
-
+    print ("end---")
+    return mylist
+end

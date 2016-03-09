@@ -1,12 +1,14 @@
 require 'DataContainer'
-require 'TripletNet'
+require 'TripletNet2'
 require 'cutorch'
 require 'eladtools'
 require 'optim'
 require 'xlua'
 require 'trepl'
 require 'DistanceRatioCriterion'
+require 'TripletEmbeddingCriterion'
 require 'cunn'
+require 'WorkerParam'
 
 ----------------------------------------------------------------------
 
@@ -28,7 +30,8 @@ cmd:option('-weightDecay',        1e-4,                   'L2 penalty on the wei
 cmd:option('-momentum',           0.9,                    'momentum')
 -- cmd:option('-batchSize',          128,                    'batch size')
 -- cmd:option('-batchSize',          1,                    'batch size')
-cmd:option('-batchSize',          8,                    'batch size')
+--cmd:option('-batchSize',          8,                    'batch size')
+cmd:option('-batchSize',          4,                    'batch size')
 --cmd:option('-optimization',       'sgd',                  'optimization method')
 cmd:option('-optimization',       'adadelta',                  'optimization method')
 cmd:option('-epoch',              -1,                     'number of epochs to train, -1 for unbounded')
@@ -45,7 +48,7 @@ cmd:option('-save',               os.date():gsub(' ',''), 'save directory')
 cmd:text('===>Data Options')
 cmd:option('-dataset',            'fashion',              'Dataset - Cifar10 or Cifar100')
 --cmd:option('-size',               640000,                 'size of training list' )
-cmd:option('-size',               64000,                 'size of training list' )
+cmd:option('-size',               640,                 'size of training list' )
 --cmd:option('-size',               6400,                 'size of training list' )
 cmd:option('-normalize',          1,                      '1 - normalize using only 1 mean and std values')
 cmd:option('-whiten',             false,                  'whiten data')
@@ -69,18 +72,14 @@ if opt.augment then
     require 'image'
 end
 
--------------
-local threads = require 'threads'
-local nthread = 4
-local thread_pool = threads.Threads( nthread )
-
 
 ----------------------------------------------------------------------
 -- Model + Loss:
 
 local EmbeddingNet = require(opt.network)
-local TripletNet = nn.TripletNet(EmbeddingNet)
-local Loss = nn.DistanceRatioCriterion()
+local TripletNet = nn.TripletNet2(EmbeddingNet)
+--local Loss = nn.DistanceRatioCriterion()
+local Loss = nn.TripletEmbeddingCriterion()
 TripletNet:cuda()
 Loss:cuda()
 
@@ -98,7 +97,8 @@ end
 -- local data = require 'Data'
 local data = require 'TripleData'
 local SizeTrain = opt.size or 640000
-local SizeTest = SizeTrain*0.1
+--local SizeTest = SizeTrain*0.1
+local SizeTest = 6400 
 
 function ReGenerateTrain()
     return GenerateListTriplets(data.TrainData,SizeTrain)
@@ -124,33 +124,35 @@ print(TripletNet)
 print '==> Loss'
 print(Loss)
 
-----------------------------------------------------------------------
+print( "LoadNormalizedResolutionImage():", LoadNormalizedResolutionImage)
+
+---------------------------------------------------------------------
 local TrainDataContainer = DataContainer{
-    Data = data.TrainData.imagepool,
+    Data = data.TrainData.data,
     List = TrainList,
     TensorType = 'torch.CudaTensor',
     BatchSize = opt.batchSize,
     Augment = opt.augment,
     ListGenFunc = ReGenerateTrain,
-    BulkImage = false
+    BulkImage = false,
+    LoadImageFunc = LoadNormalizedResolutionImage,
+    Resolution = {3, 299, 299}
 }
 
 local TestDataContainer = DataContainer{
-    Data = data.TestData.imagepool,
+    Data = data.TestData.data,
     List = TestList,
     TensorType = 'torch.CudaTensor',
     BatchSize = opt.batchSize,
-    BulkImage = false
+    BulkImage = false,
+    LoadImageFunc = LoadNormalizedResolutionImage,
+    Resolution = {3, 299, 299}
 }
 
 
 local function ErrorCount(y)
-    if torch.type(y) == 'table' then
-      y = y[#y]
-    end
-
-    --print ("y==size:", y) -- batch x 2
-    return (y[{{},2}]:ge(y[{{},1}]):sum())
+    loss = Loss:forward(y)
+    return loss
 end
 
 local optimState = {
@@ -169,45 +171,143 @@ local optimizer = Optimizer{
     Parameters = {Weights, Gradients},
 }
 
+-------------
+local threads = require 'threads'
+local nthread =1
+local thread_pool = threads.Threads( nthread, function(idx)
+                    require 'DataContainer'
+                    require 'nn'
+                    require 'torch'
+                    require 'threads'
+                    require 'cudnn'
+                    require 'WorkerParam'
+                    require 'preprocess'
+                    require 'image'
+                    require 'math'
+
+                    print ("thread init:" .. idx)
+                end,
+                function(idx)
+                    print ("set data: " .. idx)
+                end)
+                
 function Train(DataC)
     print ("Train")
+    thread_pool:synchronize()
     DataC:Reset()
     DataC:GenerateList()
     TripletNet:training()
+
     local err = 0
     local num = 1
-    local x = DataC:GetNextBatch()
-
-    while x do
+    while DataC:IsContinue() do
+        local mylist = DataC:GetNextBatch()
+        --print ("LoadImageFunc:", DataC.LoadImageFunc)
+        local jobparam = WorkerParam(mylist, DataC.TensorType, DataC.Resolution, DataC.LoadImageFunc, DataC.NumEachSet)
         -- print ("train #", x)
-        local y = optimizer:optimize({x[1],x[2],x[3]}, 1)
-        local lerr = ErrorCount(y)
+        thread_pool:addjob(
+                function (param)
+                    local function catnumsize(num,size)
+                        local stg = torch.longstorage(#size+1)
+                        stg[1] = num
+                        for i=2,stg:size() do
+                            stg[i]=size[i-1]
+                        end
+                        return stg
+                    end
+                    --print ( string.format("%x, getnextbatch()", __threadid) )
+                    local batchlist = param.batchlist
+                    local batch = torch.tensor():type(param.tensortype)
+                    local size = #batchlist
+                    nsz = catnumsize(param.numeachset, catnumsize(size,  param.resolution))
+                    batch:resize(nsz)
 
-        print( "lerr: ", lerr*100.0/y:size(1) )
+                    --print ("batch:resize:", nsz)
+                    for i=1, param.numeachset do
+                        mylist = batchlist[i]
+                        for j=1,#mylist do
+                            local filename = mylist[j]
+                            local img = param.loadimagefunc(filename)
+                            local status, err = pcall(batch[i][j]:copy(img))
+                        end
+                    end
 
-        err = err + lerr
-        xlua.progress(num*opt.batchSize, DataC:size())
-        num = num + 1
-        x = DataC:GetNextBatch()
+                    return batch
+                end,
+                function (x)
+                    if x == nil then
+                        return
+                    end
 
+                    local y = optimizer:optimize({x[1],x[2],x[3]})
+                    -- local y = optimizer:optimize({x[1],x[2],x[3]}, 1)
+                    local lerr = ErrorCount(y)
+
+                    print("y:", y)
+
+                    print( "lerr: ", lerr*100.0/y[1]:size(1) )
+
+                    err = err + lerr
+                    xlua.progress(num*opt.batchSize, DataC:size())
+                    num = num + 1
+                end,
+                jobparam 
+            )
     end
+
+    thread_pool:synchronize()
     return (err/DataC:size())
 end
 
 function Test(DataC)
+    print ("RunTest")
+    thread_pool:synchronize()
     DataC:Reset()
     TripletNet:evaluate()
     local err = 0
-    local x = DataC:GetNextBatch()
     local num = 1
-    while x do
-        local y = TripletNet:forward({x[1],x[2],x[3]})
-        local lerr = ErrorCount(y)
-        print( "Test lerr: ", lerr*100.0/y:size(1) )
-        err = err + lerr
-        xlua.progress(num*opt.batchSize, DataC:size())
-        num = num +1
-        x = DataC:GetNextBatch()
+    while DataC:IsContinue() do
+        thread_pool.addjob(
+                function() 
+                    local function catnumsize(num,size)
+                        local stg = torch.longstorage(#size+1)
+                        stg[1] = num
+                        for i=2,stg:size() do
+                            stg[i]=size[i-1]
+                        end
+                        return stg
+                    end
+                    --print ( string.format("%x, getnextbatch()", __threadid) )
+                    local batchlist = param.batchlist
+                    local batch = torch.tensor():type(param.tensortype)
+                    local size = #batchlist
+                    nsz = catnumsize(param.numeachset, catnumsize(size,  param.resolution))
+                    batch:resize(nsz)
+
+                    --print ("batch:resize:", nsz)
+                    for i=1, param.numeachset do
+                        mylist = batchlist[i]
+                        for j=1,#mylist do
+                            local filename = mylist[j]
+                            local img = param.loadimagefunc(filename)
+                            local status, err = pcall(batch[i][j]:copy(img))
+                        end
+                    end
+
+                    return batch
+                end,
+                function (x)
+                    if x == nil then
+                        return
+                    end
+                    local y = TripletNet:forward({x[1],x[2],x[3]})
+                    local lerr = ErrorCount(y)
+                    print( "Test lerr: ", lerr*100.0/y:size(1) )
+                    err = err + lerr
+                    xlua.progress(num*opt.batchSize, DataC:size())
+                    num = num +1
+                end
+            )
     end
     return (err/DataC:size())
 end
