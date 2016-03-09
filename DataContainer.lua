@@ -23,7 +23,8 @@ function DataContainer:__init(...)
     {arg='List', type='userdata', help='source of DataContainer', req=true},
     {arg='Data', type='userdata', help='Data', req = true},
     {arg='ListGenFunc', type='function', help='Generate new list'},
-    {arg='Augment', type='boolean', help='augment data',default=false}
+    {arg='Augment', type='boolean', help='augment data',default=false},
+    {arg='BulkImage', type='boolean', help='how to load bulk of list', default=false}
     )
 
     self.BatchSize = args.BatchSize
@@ -35,6 +36,7 @@ function DataContainer:__init(...)
     self.List = args.List
     self.ListGenFunc = args.ListGenFunc
     self.NumEachSet = self.List:size(2)
+    self.BulkImage = args.BulkImage
     self:Reset()
 end
 
@@ -67,9 +69,9 @@ function DataContainer:ShuffleItems()
     print('(DataContainer)===>Shuffling Items')
 
 end
+
 function DataContainer:GenerateList()
     self.List = self.ListGenFunc()
-
 end
 
 function DataContainer:GetNextBatch()
@@ -78,16 +80,46 @@ function DataContainer:GetNextBatch()
         return nil
     end
 
-    if self.Batch:dim() == 0 or size < self.BatchSize then
-        local nsz = CatNumSize(self.NumEachSet, CatNumSize(size, self.Data[1]:size()))
+    if self.Batch:dim() == 0 then
+        local nsz
+        nsz = CatNumSize(self.NumEachSet, CatNumSize(size, self.Data[1]:size()))
+        -- print ("self.Batch:resize", nsz)
+        self.Batch:resize(nsz)
+    elseif size ~= self.Batch:size(1) then
+        local nsz
+        nsz = CatNumSize(self.NumEachSet, CatNumSize(size, self.Data[1]:size()))
+        -- print ("self.Batch:resize", nsz)
         self.Batch:resize(nsz)
     end
     local batch_table = {}
-    for i=1, self.NumEachSet do
-        local d = self.Data:index(1,self.List[{{self.CurrentItem,self.CurrentItem+size-1},i}]:long())
-        self.Batch[i]:copy(d)
+    if self.BulkImage then
+        for i=1, self.NumEachSet do
+            --print ( self.List[{{self.CurrentItem,self.CurrentItem+size-1},i}]:long())
+            local d = self.Data:index(1,self.List[{{self.CurrentItem,self.CurrentItem+size-1},i}]:long())
+            self.Batch[i]:copy(d)
+        end
+    else
+        -- print ("self.Data=",self.Data)
+        for i=1, self.NumEachSet do
+            local mylist = self.List[{{self.CurrentItem,self.CurrentItem+size-1},i}]:long()
+            for j=1,mylist:size(1) do
+                local d = self.Data[mylist[j]]
+                if d:size(1) == 4 then
+                    self.Batch[i][j]:copy(d[{{1,3}}])
+                else
+                   -- print ("batch", self.Batch:size())
+                   -- print ("d:size()=", d:size())
+                   -- print ("index=", i, j)
+                   -- print ("list:size()=", mylist:size(1))
+                   -- print ("size=", size)
+                    local status, err = pcall(self.Batch[i][j]:copy(d))
+                end
+            end
+        end
     end
-    local side = self.Data:size(3)
+
+    --print ("batch size:", self.Batch[1]:size())
+    local side = self.Batch[1]:size(3)
     if self.Augment then
         for l=1,self.NumEachSet do
             for i=1,size do

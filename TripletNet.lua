@@ -7,6 +7,8 @@ local function CreateTripletNet(EmbeddingNet, inputs, distMetric, postProcess)
   local embeddings = {}
   local dists = {}
   local nets = {EmbeddingNet}
+  print("CreateTripleNet of EmbeddingNet #1:", EmbeddingNet)
+  print("CreateTripleNet of EmbeddingNet #2:", nets)
   local num = #inputs
   for i=1,num do
       if i < num then
@@ -26,9 +28,20 @@ local function CreateTripletNet(EmbeddingNet, inputs, distMetric, postProcess)
     else
       dists[i] = nn.View(-1,1)(distMetric:clone()({embedMain,embeddings[i+1]}))
     end
+
+    print ("distMetric:", distMetric)
   end
   return nets, dists, embeddings
 end
+
+--function TripletNet:updateOutput(input, target)
+--    --print ("updateOutput(input) size=:", input)
+--    local output = parent.updateOutput(self,input, target)
+--    -- print ("updateOutput(target):", target)
+--    --print ("updateOutput(output):", output:size())
+--    -- print ("updateOutput(output)=:", output[1][1], output[1][2])
+--    return output
+--end
 
 function TripletNet:__init(EmbeddingNet, num, distMetric, collectFeat)
 --collectFeat is of for {{layerNum = number, postProcess = module}, {layerNum = number, postProcess = module}...}
@@ -45,25 +58,36 @@ function TripletNet:__init(EmbeddingNet, num, distMetric, collectFeat)
       inputs[i] = nn.Identity()()
     end
 
-      local start_layer = 1
-      local currInputs = inputs
-      for f=1,#collectFeat do
+    local start_layer = 1
+    local currInputs = inputs
+    for f=1,#collectFeat do
         local end_layer = collectFeat[f].layerNum
         local net = nn.Sequential()
         for l=start_layer,end_layer do
-          net:add(self.EmbeddingNet:get(l))
+            net:add(self.EmbeddingNet:get(l))
         end
 
         local nets, dists, embeddings = CreateTripletNet(net, currInputs, self.distMetric, collectFeat[f].postProcess)
         currInputs = {}
         for i=1,self.num do
-          if not self.nets[i] then self.nets[i] = {} end
-          table.insert(self.nets[i], nets[i])
-          table.insert(currInputs, embeddings[i])
+            if not self.nets[i] then self.nets[i] = {} end
+            table.insert(self.nets[i], nets[i])
+            table.insert(currInputs, embeddings[i])
         end
+
+        print("TripletNet net:", nets)
+        print("TripletNet dist:", dists)
+        print("TripletNet start_layer:", start_layer, "end_layer:", end_layer)
         table.insert(outputs, nn.JoinTable(2)(dists))
         start_layer = end_layer+1
-      end
+    end
+
+    -- print("TripleNet:", outputs)
+    print("TripleNet:", #collectFeat)
+    print("TripleNet self.num:", self.num)
+    print("TripleNet dists:", dists)
+    print("TripleNet inputs:", inputs)
+    print("TripleNet outputs:", outputs)
 
     parent.__init(self, inputs, outputs)
 end

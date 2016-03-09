@@ -7,6 +7,7 @@ require 'xlua'
 require 'trepl'
 require 'DistanceRatioCriterion'
 require 'cunn'
+
 ----------------------------------------------------------------------
 
 
@@ -19,13 +20,17 @@ cmd:text('==>Options')
 
 cmd:text('===>Model And Training Regime')
 cmd:option('-modelsFolder',       './Models/',            'Models Folder')
-cmd:option('-network',            'Model.lua',            'embedding network file - must return valid network.')
+-- cmd:option('-network',            'Model.lua',            'embedding network file - must return valid network.')
+cmd:option('-network',            'resception.lua',            'embedding network file - must return valid network.')
 cmd:option('-LR',                 0.1,                    'learning rate')
 cmd:option('-LRDecay',            1e-6,                   'learning rate decay (in # samples)')
 cmd:option('-weightDecay',        1e-4,                   'L2 penalty on the weights')
 cmd:option('-momentum',           0.9,                    'momentum')
-cmd:option('-batchSize',          128,                    'batch size')
-cmd:option('-optimization',       'sgd',                  'optimization method')
+-- cmd:option('-batchSize',          128,                    'batch size')
+-- cmd:option('-batchSize',          1,                    'batch size')
+cmd:option('-batchSize',          8,                    'batch size')
+--cmd:option('-optimization',       'sgd',                  'optimization method')
+cmd:option('-optimization',       'adadelta',                  'optimization method')
 cmd:option('-epoch',              -1,                     'number of epochs to train, -1 for unbounded')
 
 cmd:text('===>Platform Optimization')
@@ -38,15 +43,17 @@ cmd:option('-load',               '',                     'load existing net wei
 cmd:option('-save',               os.date():gsub(' ',''), 'save directory')
 
 cmd:text('===>Data Options')
-cmd:option('-dataset',            'Cifar10',              'Dataset - Cifar10 or Cifar100')
-cmd:option('-size',               640000,                 'size of training list' )
+cmd:option('-dataset',            'fashion',              'Dataset - Cifar10 or Cifar100')
+--cmd:option('-size',               640000,                 'size of training list' )
+cmd:option('-size',               64000,                 'size of training list' )
+--cmd:option('-size',               6400,                 'size of training list' )
 cmd:option('-normalize',          1,                      '1 - normalize using only 1 mean and std values')
 cmd:option('-whiten',             false,                  'whiten data')
-cmd:option('-augment',            false,                  'Augment training data')
+cmd:option('-augment',            true,                  'Augment training data')
 cmd:option('-preProcDir',         './PreProcData/',       'Data for pre-processing (means,P,invP)')
 
 cmd:text('===>Misc')
-cmd:option('-visualize',          false,                  'display first level filters after each epoch')
+cmd:option('-visualize',          true,                  'display first level filters after each epoch')
 
 
 opt = cmd:parse(arg or {})
@@ -61,6 +68,12 @@ os.execute('mkdir -p ' .. opt.preProcDir)
 if opt.augment then
     require 'image'
 end
+
+-------------
+local threads = require 'threads'
+local nthread = 4
+local thread_pool = threads.Threads( nthread )
+
 
 ----------------------------------------------------------------------
 -- Model + Loss:
@@ -82,15 +95,16 @@ end
 
 --TripletNet:RebuildNet() --if using TripletNet instead of TripletNetBatch
 
-local data = require 'Data'
+-- local data = require 'Data'
+local data = require 'TripleData'
 local SizeTrain = opt.size or 640000
 local SizeTest = SizeTrain*0.1
 
 function ReGenerateTrain()
-    return GenerateList(data.TrainData.label,3, SizeTrain)
+    return GenerateListTriplets(data.TrainData,SizeTrain)
 end
 local TrainList = ReGenerateTrain()
-local TestList = GenerateList(data.TestData.label,3, SizeTest)
+local TestList = GenerateListTriplets(data.TestData,SizeTest)
 
 
 ------------------------- Output files configuration -----------------
@@ -100,6 +114,7 @@ cmd:log(opt.save .. '/Log.txt', opt)
 local weights_filename = paths.concat(opt.save, 'Weights.t7')
 local log_filename = paths.concat(opt.save,'ErrorProgress')
 local Log = optim.Logger(log_filename)
+Log.showPlot = false
 ----------------------------------------------------------------------
 
 print '==> Embedding Network'
@@ -111,19 +126,21 @@ print(Loss)
 
 ----------------------------------------------------------------------
 local TrainDataContainer = DataContainer{
-    Data = data.TrainData.data,
+    Data = data.TrainData.imagepool,
     List = TrainList,
     TensorType = 'torch.CudaTensor',
     BatchSize = opt.batchSize,
     Augment = opt.augment,
-    ListGenFunc = ReGenerateTrain
+    ListGenFunc = ReGenerateTrain,
+    BulkImage = false
 }
 
 local TestDataContainer = DataContainer{
-    Data = data.TestData.data,
+    Data = data.TestData.imagepool,
     List = TestList,
     TensorType = 'torch.CudaTensor',
-    BatchSize = opt.batchSize
+    BatchSize = opt.batchSize,
+    BulkImage = false
 }
 
 
@@ -131,6 +148,8 @@ local function ErrorCount(y)
     if torch.type(y) == 'table' then
       y = y[#y]
     end
+
+    --print ("y==size:", y) -- batch x 2
     return (y[{{},2}]:ge(y[{{},1}]):sum())
 end
 
@@ -151,6 +170,7 @@ local optimizer = Optimizer{
 }
 
 function Train(DataC)
+    print ("Train")
     DataC:Reset()
     DataC:GenerateList()
     TripletNet:training()
@@ -159,9 +179,13 @@ function Train(DataC)
     local x = DataC:GetNextBatch()
 
     while x do
+        -- print ("train #", x)
         local y = optimizer:optimize({x[1],x[2],x[3]}, 1)
+        local lerr = ErrorCount(y)
 
-        err = err + ErrorCount(y)
+        print( "lerr: ", lerr*100.0/y:size(1) )
+
+        err = err + lerr
         xlua.progress(num*opt.batchSize, DataC:size())
         num = num + 1
         x = DataC:GetNextBatch()
@@ -178,7 +202,9 @@ function Test(DataC)
     local num = 1
     while x do
         local y = TripletNet:forward({x[1],x[2],x[3]})
-        err = err + ErrorCount(y)
+        local lerr = ErrorCount(y)
+        print( "Test lerr: ", lerr*100.0/y:size(1) )
+        err = err + lerr
         xlua.progress(num*opt.batchSize, DataC:size())
         num = num +1
         x = DataC:GetNextBatch()
@@ -199,6 +225,7 @@ while epoch ~= opt.epoch do
     Log:add{['Training Error']= ErrTrain* 100, ['Test Error'] = ErrTest* 100}
     Log:style{['Training Error'] = '-', ['Test Error'] = '-'}
     Log:plot()
+    print ("ploted\n")
 
     if opt.visualize then
         require 'image'
@@ -209,3 +236,5 @@ while epoch ~= opt.epoch do
 
     epoch = epoch+1
 end
+
+print ("End Training\n")

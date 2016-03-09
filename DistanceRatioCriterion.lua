@@ -20,6 +20,7 @@ function DistanceRatioCriterion:updateOutput(input, target)
         self:createTarget(input, target)
     end
     self.output = self.MSE:updateOutput(self.SoftMax:updateOutput(input),self.Target)
+    -- self.output = self.MSE:updateOutput(input,self.Target)
     return self.output
 end
 
@@ -29,6 +30,7 @@ function DistanceRatioCriterion:updateGradInput(input, target)
     end
 
     self.gradInput = self.SoftMax:updateGradInput(input, self.MSE:updateGradInput(self.SoftMax.output,self.Target))
+    -- self.gradInput  = self.MSE:updateGradInput(input,self.Target)
     return self.gradInput
 end
 
