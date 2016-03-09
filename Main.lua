@@ -208,7 +208,7 @@ function Train(DataC)
         thread_pool:addjob(
                 function (param)
                     local function catnumsize(num,size)
-                        local stg = torch.longstorage(#size+1)
+                        local stg = torch.LoadStorage(#size+1)
                         stg[1] = num
                         for i=2,stg:size() do
                             stg[i]=size[i-1]
@@ -216,18 +216,18 @@ function Train(DataC)
                         return stg
                     end
                     --print ( string.format("%x, getnextbatch()", __threadid) )
-                    local batchlist = param.batchlist
-                    local batch = torch.tensor():type(param.tensortype)
+                    local batchlist = param.BatchList
+                    local batch = torch.Tensor():type(param.TensorType)
                     local size = #batchlist
-                    nsz = catnumsize(param.numeachset, catnumsize(size,  param.resolution))
+                    nsz = catnumsize(param.NumEachSet, catnumsize(size,  param.Resolution))
                     batch:resize(nsz)
 
                     --print ("batch:resize:", nsz)
-                    for i=1, param.numeachset do
+                    for i=1, param.NumEachSet do
                         mylist = batchlist[i]
                         for j=1,#mylist do
                             local filename = mylist[j]
-                            local img = param.loadimagefunc(filename)
+                            local img = param.LoadImageFunc(filename)
                             local status, err = pcall(batch[i][j]:copy(img))
                         end
                     end
@@ -267,10 +267,12 @@ function Test(DataC)
     local err = 0
     local num = 1
     while DataC:IsContinue() do
+        local mylist = DataC:GetNextBatch()
+        local jobparam = WorkerParam(mylist, DataC.TensorType, DataC.Resolution, DataC.LoadImageFunc, DataC.NumEachSet)
         thread_pool.addjob(
-                function() 
+                function (param)
                     local function catnumsize(num,size)
-                        local stg = torch.longstorage(#size+1)
+                        local stg = torch.LoadStorage(#size+1)
                         stg[1] = num
                         for i=2,stg:size() do
                             stg[i]=size[i-1]
@@ -278,18 +280,18 @@ function Test(DataC)
                         return stg
                     end
                     --print ( string.format("%x, getnextbatch()", __threadid) )
-                    local batchlist = param.batchlist
-                    local batch = torch.tensor():type(param.tensortype)
+                    local batchlist = param.BatchList
+                    local batch = torch.Tensor():type(param.TensorType)
                     local size = #batchlist
-                    nsz = catnumsize(param.numeachset, catnumsize(size,  param.resolution))
+                    nsz = catnumsize(param.NumEachSet, catnumsize(size,  param.Resolution))
                     batch:resize(nsz)
 
                     --print ("batch:resize:", nsz)
-                    for i=1, param.numeachset do
+                    for i=1, param.NumEachSet do
                         mylist = batchlist[i]
                         for j=1,#mylist do
                             local filename = mylist[j]
-                            local img = param.loadimagefunc(filename)
+                            local img = param.LoadImageFunc(filename)
                             local status, err = pcall(batch[i][j]:copy(img))
                         end
                     end
@@ -306,9 +308,11 @@ function Test(DataC)
                     err = err + lerr
                     xlua.progress(num*opt.batchSize, DataC:size())
                     num = num +1
-                end
+                end,
+                jobparam
             )
     end
+    thread_pool:synchronize()
     return (err/DataC:size())
 end
 

@@ -119,7 +119,6 @@ end
 
 
 function DataContainer:GetNextBatch()
-    print ("begin--")
     self:Lock()
     local size = math.min(self:size()-self.CurrentItem + 1, self.BatchSize)
     if size <= 0 then
@@ -131,10 +130,8 @@ function DataContainer:GetNextBatch()
     for i=0,(size-1) do
         table.insert(mylist,self.List[self.CurrentItem+i])
     end
-    print ("mylist: ", #mylist)
     self.CurrentItem = self.CurrentItem + size
     self:Unlock()
 
-    print ("end---")
     return mylist
 end
