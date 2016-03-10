@@ -199,7 +199,7 @@ function Train(DataC)
     TripletNet:training()
 
     local err = 0
-    local num = 1
+    local num = 0
     while DataC:IsContinue() do
         local mylist = DataC:GetNextBatch()
         --print ("LoadImageFunc:", DataC.LoadImageFunc)
@@ -208,7 +208,7 @@ function Train(DataC)
         thread_pool:addjob(
                 function (param)
                     local function catnumsize(num,size)
-                        local stg = torch.LoadStorage(#size+1)
+                        local stg = torch.LongStorage(#size+1)
                         stg[1] = num
                         for i=2,stg:size() do
                             stg[i]=size[i-1]
@@ -243,9 +243,10 @@ function Train(DataC)
                     -- local y = optimizer:optimize({x[1],x[2],x[3]}, 1)
                     local lerr = ErrorCount(y)
 
-                    print("y:", y)
+                    --print("y:", y)
 
-                    print( "lerr: ", lerr*100.0/y[1]:size(1) )
+                    -- print( "lerr: ", lerr*100.0/y[1]:size(1) )
+                    print( "lerr: ", lerr )
 
                     err = err + lerr
                     xlua.progress(num*opt.batchSize, DataC:size())
@@ -256,7 +257,7 @@ function Train(DataC)
     end
 
     thread_pool:synchronize()
-    return (err/DataC:size())
+    return (err/num)
 end
 
 function Test(DataC)
@@ -265,14 +266,14 @@ function Test(DataC)
     DataC:Reset()
     TripletNet:evaluate()
     local err = 0
-    local num = 1
+    local num = 0
     while DataC:IsContinue() do
         local mylist = DataC:GetNextBatch()
         local jobparam = WorkerParam(mylist, DataC.TensorType, DataC.Resolution, DataC.LoadImageFunc, DataC.NumEachSet)
-        thread_pool.addjob(
+        thread_pool:addjob(
                 function (param)
                     local function catnumsize(num,size)
-                        local stg = torch.LoadStorage(#size+1)
+                        local stg = torch.LongStorage(#size+1)
                         stg[1] = num
                         for i=2,stg:size() do
                             stg[i]=size[i-1]
@@ -304,7 +305,8 @@ function Test(DataC)
                     end
                     local y = TripletNet:forward({x[1],x[2],x[3]})
                     local lerr = ErrorCount(y)
-                    print( "Test lerr: ", lerr*100.0/y:size(1) )
+                    --print( "Test lerr: ", lerr*100.0/y[1]:size(1) )
+                    print( "Test lerr: ", lerr )
                     err = err + lerr
                     xlua.progress(num*opt.batchSize, DataC:size())
                     num = num +1
@@ -313,7 +315,7 @@ function Test(DataC)
             )
     end
     thread_pool:synchronize()
-    return (err/DataC:size())
+    return (err/num)
 end
 
 

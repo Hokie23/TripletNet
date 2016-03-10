@@ -29,7 +29,7 @@ function isColorImage(img)
 end
 
 function LoadNormalizedResolutionImage(filename)
-    print ("loading..." .. filename)
+    --print ("loading..." .. filename)
     local imagepath = imagePath .. filename
     return preprocess(imagepath)
 end
