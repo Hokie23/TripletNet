@@ -20,19 +20,18 @@ function DataContainer:__init(...)
     'InitializeData',
     'Initializes a DataContainer ',
     {arg='BatchSize', type='number', help='Number of Elements in each Batch',req = true},
-    {arg='TensorType', type='string', help='Type of Tensor', default = 'torch.FloatTensor'},
+    {arg='TensorType', type='string', help='Type of Tensor', default = 'torch.FloatTensor', req=true},
     {arg='ExtractFunction', type='function', help='function used to extract Data, Label and Info', default= function(...) return ... end},
-    {arg='List', type='userdata', help='source of DataContainer', req=true},
+    {arg='List', type='userdata', help='source of DataContainer', req=false, default=nil},
     {arg='Data', type='userdata', help='Data', req = true},
     {arg='ListGenFunc', type='function', help='Generate new list'},
     {arg='Augment', type='boolean', help='augment data',default=false},
     {arg='BulkImage', type='boolean', help='how to load bulk of list', default=false},
     {arg='Resolution', type='number', help='how to load bulk of list', req=true},
-    {arg='LoadImageFunc', type='function', help='how to load bulk of list', req = true}
+    {arg='LoadImageFunc', type='function', help='how to load bulk of list', req = true},
+    {arg='NumEachSet', type='number', help='each set', req=true, default=3}
     )
 
-    print ("list:", args.List[1])
-    print ("list size:", #args.List[1])
 
     --self.CurrentItemMutex = thread.Mutex()
     self.BatchSize = args.BatchSize
@@ -43,7 +42,7 @@ function DataContainer:__init(...)
     self.Data = args.Data
     self.List = args.List
     self.ListGenFunc = args.ListGenFunc
-    self.NumEachSet = #self.List[1]
+    self.NumEachSet = args.NumEachSet
     self.BulkImage = args.BulkImage
     self.Resolution = args.Resolution
     self.LoadImageFunc = args.LoadImageFunc
@@ -80,8 +79,8 @@ function DataContainer:ShuffleItems()
 
 end
 
-function DataContainer:GenerateList()
-    self.List = self.ListGenFunc()
+function DataContainer:GenerateList(net)
+    self.List = self.ListGenFunc(net)
 end
 
 function DataContainer:LoadBatch(batchlist)
@@ -118,7 +117,7 @@ function DataContainer:Unlock()
 end
 
 
-function DataContainer:GetNextBatch()
+function DataContainer:GetNextBatch(net)
     self:Lock()
     local size = math.min(self:size()-self.CurrentItem + 1, self.BatchSize)
     if size <= 0 then

@@ -24,14 +24,14 @@ cmd:text('===>Model And Training Regime')
 cmd:option('-modelsFolder',       './Models/',            'Models Folder')
 -- cmd:option('-network',            'Model.lua',            'embedding network file - must return valid network.')
 cmd:option('-network',            'resception.lua',            'embedding network file - must return valid network.')
-cmd:option('-LR',                 0.1,                    'learning rate')
+cmd:option('-LR',                 0.005,                    'learning rate')
 cmd:option('-LRDecay',            1e-6,                   'learning rate decay (in # samples)')
 cmd:option('-weightDecay',        1e-4,                   'L2 penalty on the weights')
 cmd:option('-momentum',           0.9,                    'momentum')
 -- cmd:option('-batchSize',          128,                    'batch size')
 -- cmd:option('-batchSize',          1,                    'batch size')
 --cmd:option('-batchSize',          8,                    'batch size')
-cmd:option('-batchSize',          4,                    'batch size')
+cmd:option('-batchSize',          6,                    'batch size')
 --cmd:option('-optimization',       'sgd',                  'optimization method')
 cmd:option('-optimization',       'adadelta',                  'optimization method')
 cmd:option('-epoch',              -1,                     'number of epochs to train, -1 for unbounded')
@@ -49,7 +49,9 @@ cmd:text('===>Data Options')
 cmd:option('-dataset',            'fashion',              'Dataset - Cifar10 or Cifar100')
 --cmd:option('-size',               640000,                 'size of training list' )
 --cmd:option('-size',               640,                 'size of training list' )
-cmd:option('-size',               6400,                 'size of training list' )
+cmd:option('-size',               64,                 'size of training list' )
+--cmd:option('-size',               6400,                 'size of training list' )
+--cmd:option('-size',               64000,                 'size of training list' )
 cmd:option('-normalize',          1,                      '1 - normalize using only 1 mean and std values')
 cmd:option('-whiten',             false,                  'whiten data')
 cmd:option('-augment',            true,                  'Augment training data')
@@ -98,13 +100,8 @@ end
 local data = require 'TripleData'
 local SizeTrain = opt.size or 640000
 --local SizeTest = SizeTrain*0.1
-local SizeTest = 6400 
-
-function ReGenerateTrain()
-    return GenerateListTriplets(data.TrainData,SizeTrain)
-end
-local TrainList = ReGenerateTrain()
-local TestList = GenerateListTriplets(data.TestData,SizeTest)
+--local SizeTest = 6400 
+local SizeTest = 64
 
 
 ------------------------- Output files configuration -----------------
@@ -127,14 +124,26 @@ print(Loss)
 print( "LoadNormalizedResolutionImage():", LoadNormalizedResolutionImage)
 
 ---------------------------------------------------------------------
+
+function ReGenerateTrain(net, selection_mode)
+    if selection_mode then
+        return GenerateListTriplets(data.TrainData,SizeTrain)
+    else
+        --return SelectListTriplets(net,data.TrainData,SizeTrain, 'torch.FloatTensor')
+        return SelectListTriplets(net,data.TrainData,SizeTrain, 'torch.CudaTensor')
+    end
+end
+
+local TestList = GenerateListTriplets(data.TestData,SizeTest)
+
 local TrainDataContainer = DataContainer{
     Data = data.TrainData.data,
-    List = TrainList,
     TensorType = 'torch.CudaTensor',
     BatchSize = opt.batchSize,
     Augment = opt.augment,
     ListGenFunc = ReGenerateTrain,
     BulkImage = false,
+    NumEachSet = 3,
     LoadImageFunc = LoadNormalizedResolutionImage,
     Resolution = {3, 299, 299}
 }
@@ -145,6 +154,7 @@ local TestDataContainer = DataContainer{
     TensorType = 'torch.CudaTensor',
     BatchSize = opt.batchSize,
     BulkImage = false,
+    NumEachSet = 3,
     LoadImageFunc = LoadNormalizedResolutionImage,
     Resolution = {3, 299, 299}
 }
@@ -192,71 +202,77 @@ local thread_pool = threads.Threads( nthread, function(idx)
                 end)
                 
 function Train(DataC)
-    print ("Train")
-    thread_pool:synchronize()
-    DataC:Reset()
-    DataC:GenerateList()
-    TripletNet:training()
-
+    print ("RunTrain")
     local err = 0
     local num = 0
-    while DataC:IsContinue() do
-        local mylist = DataC:GetNextBatch()
-        --print ("LoadImageFunc:", DataC.LoadImageFunc)
-        local jobparam = WorkerParam(mylist, DataC.TensorType, DataC.Resolution, DataC.LoadImageFunc, DataC.NumEachSet)
-        -- print ("train #", x)
-        thread_pool:addjob(
-                function (param)
-                    local function catnumsize(num,size)
-                        local stg = torch.LongStorage(#size+1)
-                        stg[1] = num
-                        for i=2,stg:size() do
-                            stg[i]=size[i-1]
+
+    for epoch=1,10 do
+        print ("Train epoch:", epoch)
+        thread_pool:synchronize()
+        DataC:Reset()
+        EmbeddingNet:evaluate()
+        DataC:GenerateList(EmbeddingNet, true)
+        collectgarbage()
+        EmbeddingNet:training()
+        TripletNet:training()
+        while DataC:IsContinue() do
+            local mylist = DataC:GetNextBatch()
+            --print ("LoadImageFunc:", DataC.LoadImageFunc)
+            local jobparam = WorkerParam(mylist, DataC.TensorType, DataC.Resolution, DataC.LoadImageFunc, DataC.NumEachSet)
+            -- print ("train #", x)
+            thread_pool:addjob(
+                    function (param)
+                        local function catnumsize(num,size)
+                            local stg = torch.LongStorage(#size+1)
+                            stg[1] = num
+                            for i=2,stg:size() do
+                                stg[i]=size[i-1]
+                            end
+                            return stg
                         end
-                        return stg
-                    end
-                    --print ( string.format("%x, getnextbatch()", __threadid) )
-                    local batchlist = param.BatchList
-                    local batch = torch.Tensor():type(param.TensorType)
-                    local size = #batchlist
-                    nsz = catnumsize(param.NumEachSet, catnumsize(size,  param.Resolution))
-                    batch:resize(nsz)
+                        --print ( string.format("%x, getnextbatch()", __threadid) )
+                        local batchlist = param.BatchList
+                        local batch = torch.Tensor():type(param.TensorType)
+                        local size = #batchlist
+                        nsz = catnumsize(param.NumEachSet, catnumsize(size,  param.Resolution))
+                        batch:resize(nsz)
 
-                    --print ("batch:resize:", nsz)
-                    for i=1, param.NumEachSet do
-                        mylist = batchlist[i]
-                        for j=1,#mylist do
-                            local filename = mylist[j]
-                            local img = param.LoadImageFunc(filename)
-                            local status, err = pcall(batch[i][j]:copy(img))
+                        --print ("batch:resize:", nsz)
+                        for i=1, param.NumEachSet do
+                            mylist = batchlist[i]
+                            for j=1,#mylist do
+                                local filename = mylist[j]
+                                local img = param.LoadImageFunc(filename)
+                                local status, err = pcall(batch[i][j]:copy(img))
+                            end
                         end
-                    end
 
-                    return batch
-                end,
-                function (x)
-                    if x == nil then
-                        return
-                    end
+                        return batch
+                    end,
+                    function (x)
+                        if x == nil then
+                            return
+                        end
 
-                    local y = optimizer:optimize({x[1],x[2],x[3]})
-                    -- local y = optimizer:optimize({x[1],x[2],x[3]}, 1)
-                    local lerr = ErrorCount(y)
+                        local y = optimizer:optimize({x[1],x[2],x[3]})
+                        -- local y = optimizer:optimize({x[1],x[2],x[3]}, 1)
+                        local lerr = ErrorCount(y)
 
-                    --print("y:", y)
+                        --print("y:", y)
 
-                    -- print( "lerr: ", lerr*100.0/y[1]:size(1) )
-                    print( "lerr: ", lerr )
+                        -- print( "lerr: ", lerr*100.0/y[1]:size(1) )
+                        print( string.format("Train lerr: %e", lerr ) )
 
-                    err = err + lerr
-                    xlua.progress(num*opt.batchSize, DataC:size())
-                    num = num + 1
-                end,
-                jobparam 
-            )
+                        err = err + lerr
+                        xlua.progress(num*opt.batchSize, DataC:size())
+                        num = num + 1
+                    end,
+                    jobparam 
+                )
+        end
+
+        thread_pool:synchronize()
     end
-
-    thread_pool:synchronize()
     return (err/num)
 end
 
@@ -306,7 +322,7 @@ function Test(DataC)
                     local y = TripletNet:forward({x[1],x[2],x[3]})
                     local lerr = ErrorCount(y)
                     --print( "Test lerr: ", lerr*100.0/y[1]:size(1) )
-                    print( "Test lerr: ", lerr )
+                    print( string.format("Test lerr: %e", lerr ) )
                     err = err + lerr
                     xlua.progress(num*opt.batchSize, DataC:size())
                     num = num +1
