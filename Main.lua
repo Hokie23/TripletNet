@@ -49,7 +49,8 @@ cmd:text('===>Data Options')
 cmd:option('-dataset',            'fashion',              'Dataset - Cifar10 or Cifar100')
 --cmd:option('-size',               640000,                 'size of training list' )
 --cmd:option('-size',               640,                 'size of training list' )
-cmd:option('-size',               64,                 'size of training list' )
+cmd:option('-size',               180,                 'size of training list' )
+--cmd:option('-size',               64,                 'size of training list' )
 --cmd:option('-size',               640,                 'size of training list' )
 --cmd:option('-size',               64000,                 'size of training list' )
 cmd:option('-normalize',          1,                      '1 - normalize using only 1 mean and std values')
@@ -207,7 +208,7 @@ function Train(DataC)
     print ("RunTrain")
     local err = 0
     local num = 0
-    local nepoch = 1
+    local nepoch = 4
 
     for epoch=1,nepoch do
         print ("Train epoch:", epoch)
@@ -245,7 +246,11 @@ function Train(DataC)
                             for i=1, param.NumEachSet do
                                 local filename = batchlist[j].names[i]
                                 local jitter = batchlist[j].jitter[i]
-                                local img = param.LoadImageFunc(filename, jitter)
+                                local ok, img = pcall(param.LoadImageFunc,filename, jitter)
+                                if ok == false then
+                                    return nil
+                                end
+
                                 batch[i][j]:copy(img)
                             end
                         end
@@ -315,7 +320,7 @@ function Test(DataC)
                         for i=1, param.NumEachSet do
                             local filename = batchlist[j].names[i]
                             local jitter = batchlist[j].jitter[i]
-                            print (filename, jitter)
+                            --print (filename, jitter)
                             local img = param.LoadImageFunc(filename, jitter)
                             batch[i][j]:copy(img)
                         end

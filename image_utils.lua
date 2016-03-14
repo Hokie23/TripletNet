@@ -219,7 +219,8 @@ function image_utils.jitter(input, sampleSize, jitter)
   local w1 = jitter.w1
   local ok, output = pcall(image.crop,input, w1, h1, w1 + oW, h1 + oH)
   if ok == false then
-      print ("w=", input:size(3), "h=", input:size(2), w1, h1, w1+oW, h1+oH)
+      print ("sampleSize:", sampleSize)
+      print ("w=", input:size(3), "h=", input:size(2), "x:", w1, "y:", h1, "cw:", w1+oW, "ch", h1+oH)
       error(output)
   end
   assert(output:size(3) == oW)
@@ -235,8 +236,15 @@ function image_utils.random_jitter(input, sampleSize)
   local iH = input:size(2)
   local oW = sampleSize[3]
   local oH = sampleSize[2]
-  local h1 = math.ceil(torch.uniform(1e-2, iH-oH))
-  local w1 = math.ceil(torch.uniform(1e-2, iW-oW))
+  local h1 = math.floor(torch.uniform(1e-2, iH-oH))-1
+  local w1 = math.floor(torch.uniform(1e-2, iW-oW))-1
+  if h1 < 0 then
+      h1 = 0
+  end
+  if w1 < 0 then
+      w1 = 0
+  end
+
   local output = image.crop(input, w1, h1, w1 + oW, h1 + oH)
   assert(output:size(3) == oW)
   assert(output:size(2) == oH)
