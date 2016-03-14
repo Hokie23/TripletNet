@@ -101,6 +101,14 @@ function DataContainer:LoadBatch(batchlist)
 end
 
 function DataContainer:IsContinue()
+    if self.List == nil then
+        return false
+    end
+
+    if #self.List == 0 then
+        return false
+    end
+
     if self.CurrentItem <= #self.List then
         return true
     end

@@ -24,7 +24,7 @@ cmd:text('===>Model And Training Regime')
 cmd:option('-modelsFolder',       './Models/',            'Models Folder')
 -- cmd:option('-network',            'Model.lua',            'embedding network file - must return valid network.')
 cmd:option('-network',            'resception.lua',            'embedding network file - must return valid network.')
-cmd:option('-LR',                 0.005,                    'learning rate')
+cmd:option('-LR',                 0.001,                    'learning rate')
 cmd:option('-LRDecay',            1e-6,                   'learning rate decay (in # samples)')
 cmd:option('-weightDecay',        1e-4,                   'L2 penalty on the weights')
 cmd:option('-momentum',           0.9,                    'momentum')
@@ -69,6 +69,8 @@ cutorch.setDevice(opt.devid)
 opt.network = opt.modelsFolder .. paths.basename(opt.network, '.lua')
 opt.save = paths.concat('./Results', opt.save)
 opt.preProcDir = paths.concat(opt.preProcDir, opt.dataset .. '/')
+
+print( string.format('preProcDir: %s', opt.preProcDir) )
 os.execute('mkdir -p ' .. opt.preProcDir)
 if opt.augment then
     require 'image'
@@ -100,8 +102,8 @@ end
 local data = require 'TripleData'
 local SizeTrain = opt.size or 640000
 --local SizeTest = SizeTrain*0.1
---local SizeTest = 6400 
-local SizeTest = 64
+local SizeTest = 6400 
+--local SizeTest = 64
 
 
 ------------------------- Output files configuration -----------------
@@ -206,7 +208,7 @@ function Train(DataC)
     local err = 0
     local num = 0
 
-    for epoch=1,10 do
+    for epoch=1,100 do
         print ("Train epoch:", epoch)
         thread_pool:synchronize()
         DataC:Reset()
@@ -273,6 +275,10 @@ function Train(DataC)
 
         thread_pool:synchronize()
     end
+
+    if num == 0 then
+        return 0
+    end
     return (err/num)
 end
 
@@ -331,6 +337,9 @@ function Test(DataC)
             )
     end
     thread_pool:synchronize()
+    if num == 0 then
+        return 0
+    end
     return (err/num)
 end
 

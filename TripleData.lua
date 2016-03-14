@@ -162,7 +162,7 @@ function SelectListTriplets(embedding_net, db, size, TensorType)
             for ni=1,4 do
                 bdist = dist(anchor_vector, negative_vector[ni])
                 --print ("negative bdist", bdist)
-                if bdist > 0 then
+                if bdist > 0.02 then
                     if (bdist > ap_dist and bdist < small_dist) or math.random(5) == 1 then
                         small_dist = bdist
                         semi_hard_negative_name = neg_batch_name[ni]
@@ -177,11 +177,10 @@ function SelectListTriplets(embedding_net, db, size, TensorType)
             end
         end
 
-        print ("anchor_name", anchor_name, "ap_dist:", ap_dist, "an_dist", an_dist)
-
         --print(anchor_name, negative_name, positive_name)
        
         if bisfound then
+            print ("anchor_name", anchor_name, "ap_dist:", ap_dist, "an_dist", an_dist)
             local exemplar = {anchor_name, semi_hard_negative_name, hard_positive_name}
             --print ("exemplar", exemplar)
             table.insert(list, exemplar)
@@ -296,7 +295,8 @@ function LoadData(filepath)
 
     label_pairs = csvigo.load( {path=DataPath .. filepath, mode='large'} )
 
-    for i=1,#label_pairs,1000 do
+    --for i=1,#label_pairs,1000 do
+    for i=1,#label_pairs do
         m = label_pairs[i]
         local a_name = m[2]
         local t_name = m[3]
@@ -409,43 +409,48 @@ function SplitData(Data)
 end
 
 function save_data()
-    torch.save(PreProcDir .. 'fashion_save.t7', 'save')
-    torch.save(PreProcDir .. 'train.resolution.t7', TrainData.Resolution)
-    torch.save(PreProcDir .. 'train.data.anchor_name_list.t7', TrainData.data.anchor_name_list)
-    torch.save(PreProcDir .. 'train.data.positive.t7', TrainData.data.positive)
-    torch.save(PreProcDir .. 'train.data.negative.t7', TrainData.data.negative)
+    torch.save(PreProcDir .. '/fashion_save.t7', 'save')
+    torch.save(PreProcDir .. '/train.resolution.t7', TrainData.Resolution)
+    torch.save(PreProcDir .. '/train.data.anchor_name_list.t7', TrainData.data.anchor_name_list)
+    torch.save(PreProcDir .. '/train.data.positive.t7', TrainData.data.positive)
+    torch.save(PreProcDir .. '/train.data.negative.t7', TrainData.data.negative)
 
-    torch.save(PreProcDir .. 'test.resolution.t7', TestData.Resolution)
-    torch.save(PreProcDir .. 'test.data.anchor_name_list.t7', TestData.data.anchor_name_list)
-    torch.save(PreProcDir .. 'test.data.positive.t7', TestData.data.positive)
-    torch.save(PreProcDir .. 'test.data.negative.t7', TestData.data.negative)
+    torch.save(PreProcDir .. '/test.resolution.t7', TestData.Resolution)
+    torch.save(PreProcDir .. '/test.data.anchor_name_list.t7', TestData.data.anchor_name_list)
+    torch.save(PreProcDir .. '/test.data.positive.t7', TestData.data.positive)
+    torch.save(PreProcDir .. '/test.data.negative.t7', TestData.data.negative)
 end
 
 function load_data()
-    if path.exists( PreProcDir .. 'fashion_save.t7') then
+    local checkfile = PreProcDir .. '/fashion_save.t7'
+    if path.exists( checkfile ) == false then
+        print ( string.format("cannot find %s", checkfile) )
         return nil
     end
     TrainData = {data={},Resolution={}}
-    TrainData.Resolution = torch.load(PreProcDir .. 'train.resolution.t7')
-    TrainData.data.anchor_name_list = torch.load(PreProcDir .. 'train.data.anchor_name_list.t7')
-    TrainData.data.positive = torch.load(PreProcDir .. 'train.data.positive.t7')
-    TrainData.data.negative = torch.load(PreProcDir .. 'train.data.negative.t7')
+    TrainData.Resolution = torch.load(PreProcDir .. '/train.resolution.t7')
+    TrainData.data.anchor_name_list = torch.load(PreProcDir .. '/train.data.anchor_name_list.t7')
+    TrainData.data.positive = torch.load(PreProcDir .. '/train.data.positive.t7')
+    TrainData.data.negative = torch.load(PreProcDir .. '/train.data.negative.t7')
 
     TestData = {data={},Resolution={}}
-    TestData.Resolution = torch.load(PreProcDir .. 'test.resolution.t7')
-    TestData.data.anchor_name_list = torch.load(PreProcDir .. 'test.data.anchor_name_list.t7')
-    TestData.data.positive = torch.load(PreProcDir .. 'test.data.positive.t7')
-    TestData.data.negative = torch.load(PreProcDir .. 'test.data.negative.t7')
+    TestData.Resolution = torch.load(PreProcDir .. '/test.resolution.t7')
+    TestData.data.anchor_name_list = torch.load(PreProcDir .. '/test.data.anchor_name_list.t7')
+    TestData.data.positive = torch.load(PreProcDir .. '/test.data.positive.t7')
+    TestData.data.negative = torch.load(PreProcDir .. '/test.data.negative.t7')
 
-    return RetData { TrainData = TrainData, TestData = TestData }
+    return { TrainData = TrainData, TestData = TestData }
 end
 
-save_filename = PreProcDir .. '/fashion_data.t7' 
+--save_filename = PreProcDir .. '/fashion_data.t7' 
+save_filename = PreProcDir .. '/fashion_save.t7' 
+rawdata_filename = PreProcDir .. '/fashion_rawdata.t7' 
 
 print ("check chached file:" .. save_filename)
 if path.exists(save_filename) ~= false then
     print ("cached model")
-    Data = torch.load(save_filename )
+    --Data = torch.load(save_filename )
+    Data = load_data()
 
     print ("Train Data size:", #Data.TrainData.data.anchor_name_list)
     print ("Test Data size:", #Data.TestData.data.anchor_name_list)
@@ -454,6 +459,7 @@ end
 
 local Data = LoadData('fashion_pair.csv')
 
+torch.save( rawdata_filename, Data )
 TrainData, TestData = SplitData(Data)
 RetData= {TrainData=TrainData, TestData=TestData}
 
