@@ -72,12 +72,12 @@ function DataContainer:__tostring__()
     return str
 end
 
-function DataContainer:ShuffleItems()
-    local RandOrder = torch.randperm(self.List:size(1)):long()
-    self.List = self.List:indexCopy(1,RandOrder,self.List)
-    print('(DataContainer)===>Shuffling Items')
-
-end
+--function DataContainer:ShuffleItems()
+--    local RandOrder = torch.randperm(self.List.exemplar_list:size(1)):long()
+--    self.List = self.List:indexCopy(1,RandOrder,self.List)
+--    print('(DataContainer)===>Shuffling Items')
+--
+--end
 
 function DataContainer:GenerateList(net)
     self.List = self.ListGenFunc(net)
@@ -85,15 +85,16 @@ end
 
 function DataContainer:LoadBatch(batchlist)
     local batch = torch.Tensor():type(self.TensorType)
-    local size = #mylist
+    local size = #batchlist
     nsz = CatNumSize(self.NumEachSet, CatNumSize(size,  self.Resolution))
     batch:resize(nsz)
     for i=1, self.NumEachSet do
         mylist = batchlist[{{i},{}}]
         for j=1,mylist:size(1) do
-            local filename = mylist[j]
-            local img = self.LoadImageFunc(filename)
-            local status, err = pcall(self.Batch[i][j]:copy(img))
+            local filename = mylist[j].name
+            local jitter = mylist[j].jitter
+            local img = self.LoadImageFunc(filename, jitter)
+            self.Batch[i][j]:copy(img)
         end
     end
 

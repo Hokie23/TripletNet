@@ -28,11 +28,16 @@ function isColorImage(img)
     return img:size(1) == 3 and img:dim() == 3
 end
 
-function LoadNormalizedResolutionImage(filename)
-    print ("loading...", filename)
+function LoadNormalizedResolutionImage(filename, jitter)
+    --print ("loading...", filename)
     local imagepath = imagePath .. filename
-    return preprocess(imagepath)
+    if jitter == nil then
+        return preprocess(imagepath)
+    else
+        return preprocess_with_jitter(imagepath, jitter)
+    end
 end
+
 
 
 function dist(a, b)
@@ -66,6 +71,7 @@ function SelectListTriplets(embedding_net, db, size, TensorType)
     for i=1, size do
         local anchor_img
         local anchor_vector, positive_vector, negative_vector
+        local anchor_jitter, positive_jitter, negative_jitter
 
         local ap_dist, an_dist
         print ("generate list #" .. i .. "/#" .. #candidate_anchor_list)
@@ -74,11 +80,13 @@ function SelectListTriplets(embedding_net, db, size, TensorType)
 
         local nsz = torch.LongStorage(4)
         while true do
+            hard_positive_name = nil
             anchor_name = candidate_anchor_list[c1]
             local batch = torch.Tensor():type( TensorType )
             --print ( 'anchor_name:', anchor_name )
 
-            anchor_img = LoadNormalizedResolutionImage(anchor_name)
+            anchor_img, anchor_jitter = LoadNormalizedResolutionImage(anchor_name)
+            assert(anchor_img ~= nil)
             nsz[1] = 1
             nsz[2] = 3
             nsz[3] = 299
@@ -94,33 +102,35 @@ function SelectListTriplets(embedding_net, db, size, TensorType)
             if pos_of_anchor ~= nil then
                 local dupcheck = {}
                 local batch_name = {}
+                local batch_jitter = {}
                 minbatchSize = math.min(#pos_of_anchor,4)
                 nsz[1] = minbatchSize
                 batch:resize(nsz)
                 for pi=1,minbatchSize do
                     positive_name = pos_of_anchor[math.random(#pos_of_anchor)]
-                    if dupcheck[positive_name] == nil then
-                        dupcheck[positive_name] = true
-                        local img = LoadNormalizedResolutionImage(positive_name) 
-                        table.insert(batch_name, positive_name)
-                        batch[pi]:copy(img)
-                    end
+                    local img, p_jitter = LoadNormalizedResolutionImage(positive_name) 
+                    assert(img ~= nil)
+                    table.insert(batch_name, positive_name)
+                    table.insert(batch_jitter, p_jitter)
+                    batch[pi]:copy(img)
                 end
 
                 positive_vector = embedding_net:forward( batch )
                 local max_pdist = -1 
-                local max_im = {}
                 for pi=1,minbatchSize do
                     bdist = dist(anchor_vector, positive_vector[pi])
                     --print ("positive_dist", bdist)
                     if bdist > max_pdist then
                         max_pdist = bdist
                         hard_positive_name = batch_name[pi]
+                        positive_jitter = batch_jitter[pi]
+                        --print ("positive_dist", bdist)
                     end
                 end
 
                 ap_dist = max_pdist
-                if ap_dist ~= 0 then
+                if ap_dist >= 0 then
+                    --print ("hard_positive_name:", hard_positive_name)
                     break
                 end
             else
@@ -137,6 +147,7 @@ function SelectListTriplets(embedding_net, db, size, TensorType)
         --print ("anchor_name", anchor_name, "ap_dist:", ap_dist)
         for trial=1,10 do
             local neg_batch_name = {}
+            local neg_batch_jitter = {}
             for ni=1,4 do
                 local neg_of_anchor = data.negative[anchor_name]
                 if neg_of_anchor == nil or math.random(2) == 1 then
@@ -151,8 +162,10 @@ function SelectListTriplets(embedding_net, db, size, TensorType)
                     local n3 = math.random(#neg_of_anchor)
                     negative_name = neg_of_anchor[n3]
                 end
-                local img = LoadNormalizedResolutionImage(negative_name)
+                local img, n_jitter = LoadNormalizedResolutionImage(negative_name)
+                assert(img ~= nil )
                 table.insert(neg_batch_name, negative_name)
+                table.insert(neg_batch_jitter, n_jitter)
                 neg_batch[ni]:copy(img)
             end
 
@@ -166,6 +179,7 @@ function SelectListTriplets(embedding_net, db, size, TensorType)
                     if (bdist > ap_dist and bdist < small_dist) or math.random(5) == 1 then
                         small_dist = bdist
                         semi_hard_negative_name = neg_batch_name[ni]
+                        negative_jitter = neg_batch_jitter[ni]
                     end
                 end
             end
@@ -181,9 +195,12 @@ function SelectListTriplets(embedding_net, db, size, TensorType)
        
         if bisfound then
             print ("anchor_name", anchor_name, "ap_dist:", ap_dist, "an_dist", an_dist)
-            local exemplar = {anchor_name, semi_hard_negative_name, hard_positive_name}
-            --print ("exemplar", exemplar)
+            print ("anchor_name", anchor_name, "n:", semi_hard_negative_name, "p:", hard_positive_name)
+            local exemplar_name = {anchor_name, semi_hard_negative_name, hard_positive_name}
+            local exemplar_jitter = {anchor_jitter, negative_jitter, positive_jitter}
+            local exemplar = {names=exemplar_name, jitter=exemplar_jitter}
             table.insert(list, exemplar)
+            print ("exemplar", exemplar)
         end
     end
 
@@ -191,7 +208,7 @@ function SelectListTriplets(embedding_net, db, size, TensorType)
     return list
 end
 
-function GenerateListTriplets(db, size)
+function GenerateListTriplets(db, size, prefix)
     print ("generate list triplets", size)
     local data = db.data
     local list = {}
@@ -216,20 +233,29 @@ function GenerateListTriplets(db, size)
             local n1 = c1
             local n3 = math.random( #data.all_negative_list )
             negative_name = data.all_negative_list[n3]
+            print ("0", #data.all_negative_list, "n:", negative_name)
             while negative_name  == anchor_name do
                 n3 = math.random( #data.all_negative_list )
                 negative_name = data.all_negative_list[n3]
+                print("1")
             end
-
-            negative_name = data.anchor_name_list[n3]
         else
+            print ("2")
             local n3 = math.random(#neg_of_anchor)
             negative_name = neg_of_anchor[n3]
         end
 
-        local exemplar = {anchor_name, negative_name, positive_name}
+        local exemplar_names = {anchor_name, negative_name, positive_name}
+        local exemplar = {names=exemplar_names, jitter={}}
+
+        print( prefix, exemplar )
+        assert(anchor_name ~= nil)
+        assert(negative_name ~= nil)
+        assert(positive_name ~= nil)
+
         table.insert(list, exemplar)
     end
+    --error("stop test")
     return list
 end
 
@@ -459,7 +485,7 @@ function LoadNegativeData(negative_filepath)
     negative_list = csvigo.load( {path=DataPath .. negative_filepath, mode='large'} )
 
     print ("loaded: ", #negative_list)
-    for i=1,#negative_list,1000 do
+    for i=1,#negative_list,100 do
         xlua.progress(i, #negative_list)
         neg_name = negative_list[i][1]
         local img = LoadNormalizedResolutionImage(neg_name)

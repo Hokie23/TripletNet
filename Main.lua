@@ -50,7 +50,7 @@ cmd:option('-dataset',            'fashion',              'Dataset - Cifar10 or 
 --cmd:option('-size',               640000,                 'size of training list' )
 --cmd:option('-size',               640,                 'size of training list' )
 cmd:option('-size',               64,                 'size of training list' )
---cmd:option('-size',               6400,                 'size of training list' )
+--cmd:option('-size',               640,                 'size of training list' )
 --cmd:option('-size',               64000,                 'size of training list' )
 cmd:option('-normalize',          1,                      '1 - normalize using only 1 mean and std values')
 cmd:option('-whiten',             false,                  'whiten data')
@@ -129,14 +129,14 @@ print( "LoadNormalizedResolutionImage():", LoadNormalizedResolutionImage)
 
 function ReGenerateTrain(net, selection_mode)
     if selection_mode then
-        return GenerateListTriplets(data.TrainData,SizeTrain)
+        return GenerateListTriplets(data.TrainData,SizeTrain, "train")
     else
         --return SelectListTriplets(net,data.TrainData,SizeTrain, 'torch.FloatTensor')
         return SelectListTriplets(net,data.TrainData,SizeTrain, 'torch.CudaTensor')
     end
 end
 
-local TestList = GenerateListTriplets(data.TestData,SizeTest)
+local TestList = GenerateListTriplets(data.TestData,SizeTest, "prefix")
 
 local TrainDataContainer = DataContainer{
     Data = data.TrainData.data,
@@ -207,8 +207,9 @@ function Train(DataC)
     print ("RunTrain")
     local err = 0
     local num = 0
+    local nepoch = 1
 
-    for epoch=1,100 do
+    for epoch=1,nepoch do
         print ("Train epoch:", epoch)
         thread_pool:synchronize()
         DataC:Reset()
@@ -240,12 +241,12 @@ function Train(DataC)
                         batch:resize(nsz)
 
                         --print ("batch:resize:", nsz)
-                        for i=1, param.NumEachSet do
-                            mylist = batchlist[i]
-                            for j=1,#mylist do
-                                local filename = mylist[j]
-                                local img = param.LoadImageFunc(filename)
-                                local status, err = pcall(batch[i][j]:copy(img))
+                        for j=1,#batchlist do
+                            for i=1, param.NumEachSet do
+                                local filename = batchlist[j].names[i]
+                                local jitter = batchlist[j].jitter[i]
+                                local img = param.LoadImageFunc(filename, jitter)
+                                batch[i][j]:copy(img)
                             end
                         end
 
@@ -266,7 +267,7 @@ function Train(DataC)
                         print( string.format("Train lerr: %e", lerr ) )
 
                         err = err + lerr
-                        xlua.progress(num*opt.batchSize, DataC:size())
+                        xlua.progress(num, DataC:size()*nepoch)
                         num = num + 1
                     end,
                     jobparam 
@@ -310,15 +311,15 @@ function Test(DataC)
                     batch:resize(nsz)
 
                     --print ("batch:resize:", nsz)
-                    for i=1, param.NumEachSet do
-                        mylist = batchlist[i]
-                        for j=1,#mylist do
-                            local filename = mylist[j]
-                            local img = param.LoadImageFunc(filename)
-                            local status, err = pcall(batch[i][j]:copy(img))
+                    for j=1,#batchlist do
+                        for i=1, param.NumEachSet do
+                            local filename = batchlist[j].names[i]
+                            local jitter = batchlist[j].jitter[i]
+                            print (filename, jitter)
+                            local img = param.LoadImageFunc(filename, jitter)
+                            batch[i][j]:copy(img)
                         end
                     end
-
                     return batch
                 end,
                 function (x)
@@ -330,7 +331,7 @@ function Test(DataC)
                     --print( "Test lerr: ", lerr*100.0/y[1]:size(1) )
                     print( string.format("Test lerr: %e", lerr ) )
                     err = err + lerr
-                    xlua.progress(num*opt.batchSize, DataC:size())
+                    xlua.progress(num, DataC:size())
                     num = num +1
                 end,
                 jobparam

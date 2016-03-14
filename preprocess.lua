@@ -16,7 +16,19 @@ function preprocess(image_file_path)
     if ok == false then
         return nil
     end
-    local output = image_utils.random_jitter(input, sampleSize)
+    local output, jitter = image_utils.random_jitter(input, sampleSize)
+    output = image_utils.mean_std_norm(output, cnn_model_mean, cnn_model_std)
+    return output, jitter
+end
+
+function preprocess_with_jitter(image_file_path, jitter)
+    --print (image_file_path, jitter)
+    local ok, input = pcall(image_utils.loadImage,image_file_path, loadSize)
+    if ok == false then
+        return nil
+    end
+
+    local output = image_utils.jitter(input, sampleSize, jitter)
     output = image_utils.mean_std_norm(output, cnn_model_mean, cnn_model_std)
     return output
 end

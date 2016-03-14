@@ -206,9 +206,29 @@ function image_utils.random_flip(input, do_flip)
   if do_flip > 0.5 then
     input = image.hflip(input)
   end
-  return input
+  return input, do_flip
 end
 
+
+function image_utils.jitter(input, sampleSize, jitter)
+  local iW = input:size(3)
+  local iH = input:size(2)
+  local oW = sampleSize[3]
+  local oH = sampleSize[2]
+  local h1 = jitter.h1
+  local w1 = jitter.w1
+  local ok, output = pcall(image.crop,input, w1, h1, w1 + oW, h1 + oH)
+  if ok == false then
+      print ("w=", input:size(3), "h=", input:size(2), w1, h1, w1+oW, h1+oH)
+      error(output)
+  end
+  assert(output:size(3) == oW)
+  assert(output:size(2) == oH)
+
+  output = image_utils.random_flip(output, jitter.bFlip)
+
+  return output
+end
 
 function image_utils.random_jitter(input, sampleSize)
   local iW = input:size(3)
@@ -221,9 +241,9 @@ function image_utils.random_jitter(input, sampleSize)
   assert(output:size(3) == oW)
   assert(output:size(2) == oH)
 
-  output = image_utils.random_flip(output)
+  output, bFlip = image_utils.random_flip(output)
 
-  return output
+  return output, {w1=w1,h1=h1, bFlip = bFlip} 
 end
 
 function image_utils.mean_std_norm(input, mean, std)
