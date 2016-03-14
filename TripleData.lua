@@ -459,7 +459,8 @@ function LoadNegativeData(negative_filepath)
     negative_list = csvigo.load( {path=DataPath .. negative_filepath, mode='large'} )
 
     print ("loaded: ", #negative_list)
-    for i=1,#negative_list do
+    for i=1,#negative_list,1000 do
+        xlua.progress(i, #negative_list)
         neg_name = negative_list[i][1]
         local img = LoadNormalizedResolutionImage(neg_name)
         if isColorImage(img) then
@@ -514,7 +515,7 @@ else
     NegativeList.cache = false
 end 
 
-Data.negative_list = NegativeList
+Data.NegativeList = NegativeList
 TrainData, TestData = SplitData(Data)
 RetData= {TrainData=TrainData, TestData=TestData}
 
