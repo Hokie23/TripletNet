@@ -29,7 +29,7 @@ function isColorImage(img)
 end
 
 function LoadNormalizedResolutionImage(filename)
-    --print ("loading..." .. filename)
+    print ("loading...", filename)
     local imagepath = imagePath .. filename
     return preprocess(imagepath)
 end
@@ -141,12 +141,12 @@ function SelectListTriplets(embedding_net, db, size, TensorType)
                 local neg_of_anchor = data.negative[anchor_name]
                 if neg_of_anchor == nil or math.random(2) == 1 then
                     local n1 = c1
-                    local n3 = math.random(nClasses)
-                    while n3 == n1 do
-                        n3 = math.random(nClasses)
+                    local n3 = math.random( #data.all_negative_list )
+                    negative_name = data.all_negative_list[n3]
+                    while negative_name  == anchor_name do
+                        n3 = math.random( #data.all_negative_list )
+                        negative_name = data.all_negative_list[n3]
                     end
-
-                    negative_name = data.anchor_name_list[n3]
                 else
                     local n3 = math.random(#neg_of_anchor)
                     negative_name = neg_of_anchor[n3]
@@ -214,9 +214,11 @@ function GenerateListTriplets(db, size)
         local neg_of_anchor = data.negative[anchor_name]
         if neg_of_anchor == nil or math.random(2) == 1 then
             local n1 = c1
-            local n3 = math.random(nClasses)
-            while n3 == n1 do
-                n3 = math.random(nClasses)
+            local n3 = math.random( #data.all_negative_list )
+            negative_name = data.all_negative_list[n3]
+            while negative_name  == anchor_name do
+                n3 = math.random( #data.all_negative_list )
+                negative_name = data.all_negative_list[n3]
             end
 
             negative_name = data.anchor_name_list[n3]
@@ -367,7 +369,7 @@ function LoadData(filepath)
 end
 
 function SplitData(Data)
-    local TrainData = {data={},}
+    local TrainData = {data={}}
     local TestData = {data={}}
 
     local train_anchor_name_list = {}
@@ -381,7 +383,7 @@ function SplitData(Data)
         local pos_of_anchor = Data.data.positive[anchor_name] 
         if pos_of_anchor ~= nil then
             if positive_cnt >= 10 then
-                postivie_cnt = 0
+                positive_cnt = 0
                 table.insert(test_anchor_name_list, Data.data.anchor_name_list[i])
             else
                 positive_cnt = positive_cnt + 1
@@ -390,16 +392,20 @@ function SplitData(Data)
         end
     end
 
+    print ( string.format("splitdata=%d,%d", #train_anchor_name_list, #test_anchor_name_list) )
+
     TrainData.data.anchor_name_to_idx = Data.data.anchor_name_to_idx
     TrainData.data.anchor_name_list = train_anchor_name_list
     TrainData.data.positive = Data.data.positive
     TrainData.data.negative = Data.data.negative
+    TrainData.data.all_negative_list = Data.NegativeList
     TrainData.Resolution = {3, 299, 299}
 
     TestData.data.anchor_name_list = test_anchor_name_list
     TestData.data.anchor_name_to_idx = Data.data.anchor_name_to_idx
     TestData.data.positive = Data.data.positive
     TestData.data.negative = Data.data.negative
+    TestData.data.all_negative_list = Data.NegativeList
     TestData.Resolution = {3, 299, 299}
 
     print ("Train Data size:", #TrainData.data.anchor_name_list)
@@ -414,14 +420,16 @@ function save_data()
     torch.save(PreProcDir .. '/train.data.anchor_name_list.t7', TrainData.data.anchor_name_list)
     torch.save(PreProcDir .. '/train.data.positive.t7', TrainData.data.positive)
     torch.save(PreProcDir .. '/train.data.negative.t7', TrainData.data.negative)
+    torch.save(PreProcDir .. '/train.data.all_negative_list.t7', TrainData.data.all_negative_list)
 
     torch.save(PreProcDir .. '/test.resolution.t7', TestData.Resolution)
     torch.save(PreProcDir .. '/test.data.anchor_name_list.t7', TestData.data.anchor_name_list)
     torch.save(PreProcDir .. '/test.data.positive.t7', TestData.data.positive)
     torch.save(PreProcDir .. '/test.data.negative.t7', TestData.data.negative)
+    torch.save(PreProcDir .. '/test.data.all_negative_list.t7', TestData.data.all_negative_list)
 end
 
-function load_data()
+function load_cached_data()
     local checkfile = PreProcDir .. '/fashion_save.t7'
     if path.exists( checkfile ) == false then
         print ( string.format("cannot find %s", checkfile) )
@@ -432,34 +440,81 @@ function load_data()
     TrainData.data.anchor_name_list = torch.load(PreProcDir .. '/train.data.anchor_name_list.t7')
     TrainData.data.positive = torch.load(PreProcDir .. '/train.data.positive.t7')
     TrainData.data.negative = torch.load(PreProcDir .. '/train.data.negative.t7')
+    TrainData.data.all_negative_list = torch.load(PreProcDir .. '/train.data.all_negative_list.t7')
 
     TestData = {data={},Resolution={}}
     TestData.Resolution = torch.load(PreProcDir .. '/test.resolution.t7')
     TestData.data.anchor_name_list = torch.load(PreProcDir .. '/test.data.anchor_name_list.t7')
     TestData.data.positive = torch.load(PreProcDir .. '/test.data.positive.t7')
     TestData.data.negative = torch.load(PreProcDir .. '/test.data.negative.t7')
+    TestData.data.all_negative_list = torch.load(PreProcDir .. '/test.data.all_negative_list.t7')
 
     return { TrainData = TrainData, TestData = TestData }
+end
+
+function LoadNegativeData(negative_filepath)
+
+    print (string.format( DataPath .. negative_filepath ) )
+    local negative_namelist = {}
+    negative_list = csvigo.load( {path=DataPath .. negative_filepath, mode='large'} )
+
+    print ("loaded: ", #negative_list)
+    for i=1,#negative_list do
+        neg_name = negative_list[i][1]
+        local img = LoadNormalizedResolutionImage(neg_name)
+        if isColorImage(img) then
+            table.insert(negative_namelist, neg_name)
+        end
+    end
+
+    print ( string.format("#negative = %d", #negative_namelist) )
+    return negative_namelist
 end
 
 --save_filename = PreProcDir .. '/fashion_data.t7' 
 save_filename = PreProcDir .. '/fashion_save.t7' 
 rawdata_filename = PreProcDir .. '/fashion_rawdata.t7' 
 
-print ("check chached file:" .. save_filename)
-if path.exists(save_filename) ~= false then
-    print ("cached model")
-    --Data = torch.load(save_filename )
-    Data = load_data()
+print ("=========")
 
-    print ("Train Data size:", #Data.TrainData.data.anchor_name_list)
-    print ("Test Data size:", #Data.TestData.data.anchor_name_list)
-    return Data
+local Data = {}
+Data.cached = false
+if path.exists(rawdata_filename) then
+    print (string.format("load cached raw file: %s", rawdata_filename) )
+    Data = torch.load( rawdata_filename )
+    Data.cached = true
+else
+    Data = LoadData('fashion_pair.csv')
+    torch.save( rawdata_filename, Data )
+    Data.cached = false
 end
 
-local Data = LoadData('fashion_pair.csv')
+TrainData, TestData = SplitData(Data)
 
-torch.save( rawdata_filename, Data )
+--print ("check chached file:" .. save_filename)
+--if path.exists(save_filename) ~= false then
+--    print ("cached model")
+--    --Data = torch.load(save_filename )
+--    Data = load_cached_data()
+--
+--    print ("Train Data size:", #Data.TrainData.data.anchor_name_list)
+--    print ("Test Data size:", #Data.TestData.data.anchor_name_list)
+--    return Data
+--end
+--
+--local Data = LoadData('fashion_pair.csv')
+local NegativeList = {}
+negative_cache_filename = PreProcDir .. '/negative_list.t7'
+if path.exists(negative_cache_filename) then
+    NegativeList = torch.load(negative_cache_filename)
+    NegativeList.cache = true
+else
+    NegativeList = LoadNegativeData('negative_list.txt')
+    torch.save(negative_cache_filename, NegativeList)
+    NegativeList.cache = false
+end 
+
+Data.negative_list = NegativeList
 TrainData, TestData = SplitData(Data)
 RetData= {TrainData=TrainData, TestData=TestData}
 
