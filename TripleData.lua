@@ -394,14 +394,13 @@ function LoadData(filepath)
     return Data
 end
 
-function SplitData(Data)
+function SplitTrainValidData(Data)
     local TrainData = {data={}}
     local TestData = {data={}}
 
     local train_anchor_name_list = {}
     local test_anchor_name_list = {}
     local positive_cnt = 0
-    local negative_cnt = 0
 
     -- split positive
     for i=1, #Data.data.anchor_name_list do
@@ -418,7 +417,50 @@ function SplitData(Data)
         end
     end
 
-    print ( string.format("splitdata=%d,%d", #train_anchor_name_list, #test_anchor_name_list) )
+    print ( string.format("split data=T(%d),%d", #train_anchor_name_list, #test_anchor_name_list) )
+
+    TrainData.data.anchor_name_list = train_anchor_name_list
+    TrainData.data.positive = Data.data.positive
+    TrainData.data.negative = Data.data.negative
+    TrainData.data.all_negative_list = Data.NegativeList
+    TrainData.Resolution = {3, 299, 299}
+
+    TestData.data.anchor_name_list = test_anchor_name_list
+    TestData.data.positive = Data.data.positive
+    TestData.data.negative = Data.data.negative
+    TestData.data.all_negative_list = Data.NegativeList
+    TestData.Resolution = {3, 299, 299}
+
+    print ("Train Data size:", #TrainData.data.anchor_name_list)
+    print ("Test Data size:", #TestData.data.anchor_name_list)
+
+    return TrainData, TestData
+end
+
+function SplitData(Data)
+    local TrainData = {data={}}
+    local TestData = {data={}}
+
+    local train_anchor_name_list = {}
+    local test_anchor_name_list = {}
+    local positive_cnt = 0
+
+    -- split positive
+    for i=1, #Data.data.anchor_name_list do
+        local anchor_name = Data.data.anchor_name_list[i]
+        local pos_of_anchor = Data.data.positive[anchor_name] 
+        if pos_of_anchor ~= nil then
+            if positive_cnt >= 10 then
+                positive_cnt = 0
+                table.insert(test_anchor_name_list, Data.data.anchor_name_list[i])
+            else
+                positive_cnt = positive_cnt + 1
+                table.insert(train_anchor_name_list, Data.data.anchor_name_list[i])
+            end
+        end
+    end
+
+    print ( string.format("split data=T(%d),%d", #train_anchor_name_list, #test_anchor_name_list) )
 
     TrainData.data.anchor_name_to_idx = Data.data.anchor_name_to_idx
     TrainData.data.anchor_name_list = train_anchor_name_list
@@ -517,6 +559,7 @@ else
 end
 
 TrainData, TestData = SplitData(Data)
+TrainData, ValidData = SplitTrainValidData(TrainData)
 
 --print ("check chached file:" .. save_filename)
 --if path.exists(save_filename) ~= false then
