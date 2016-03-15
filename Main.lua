@@ -84,7 +84,7 @@ end
 local EmbeddingNet = require(opt.network)
 local TripletNet = nn.TripletNet2(EmbeddingNet)
 --local Loss = nn.DistanceRatioCriterion()
-local Loss = nn.TripletEmbeddingCriterion()
+local Loss = nn.TripletEmbeddingCriterion(1.0)
 TripletNet:cuda()
 Loss:cuda()
 
@@ -208,7 +208,7 @@ function Train(DataC)
     print ("RunTrain")
     local err = 0
     local num = 0
-    local nepoch = 4
+    local nepoch = 40
 
     for epoch=1,nepoch do
         print ("Train epoch:", epoch)
@@ -248,6 +248,7 @@ function Train(DataC)
                                 local jitter = batchlist[j].jitter[i]
                                 local ok, img = pcall(param.LoadImageFunc,filename, jitter)
                                 if ok == false then
+                                    print ("image load error", filename)
                                     return nil
                                 end
 
@@ -272,7 +273,7 @@ function Train(DataC)
                         print( string.format("Train lerr: %e", lerr ) )
 
                         err = err + lerr
-                        xlua.progress(num, DataC:size()*nepoch)
+                        xlua.progress(num*DataC.BatchSize, DataC:size()*nepoch)
                         num = num + 1
                     end,
                     jobparam 
@@ -336,7 +337,7 @@ function Test(DataC)
                     --print( "Test lerr: ", lerr*100.0/y[1]:size(1) )
                     print( string.format("Test lerr: %e", lerr ) )
                     err = err + lerr
-                    xlua.progress(num, DataC:size())
+                    xlua.progress(num*DataC.BatchSize, DataC:size())
                     num = num +1
                 end,
                 jobparam
