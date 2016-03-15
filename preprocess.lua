@@ -12,18 +12,19 @@ local loadSize = {3, 342, 342}
 local sampleSize = {3, 299, 299}
 
 function preprocess(image_file_path)
-    local ok, input = pcall(image_utils.loadImage,image_file_path, loadSize)
+    local ok, input, aspect_ratio = pcall(image_utils.loadImage,image_file_path, loadSize)
     if ok == false then
         return nil
     end
     local output, jitter = image_utils.random_jitter(input, sampleSize)
     output = image_utils.mean_std_norm(output, cnn_model_mean, cnn_model_std)
+    jitter.aspect_ratio = aspect_ratio
     return output, jitter
 end
 
 function preprocess_with_jitter(image_file_path, jitter)
     --print (image_file_path, jitter)
-    local ok, input = pcall(image_utils.loadImage,image_file_path, loadSize)
+    local ok, input = pcall(image_utils.loadImage,image_file_path, loadSize, jitter.aspect_ratio)
     if ok == false then
         return nil
     end

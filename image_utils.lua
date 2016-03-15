@@ -105,7 +105,8 @@ function image_utils.resize_crop(input, loadSize, preserve_aspect_ratio)
   else
     output = image.scale(input, loadSize[2], loadSize[3])
   end
-  return output
+
+  return output, preserve_aspect_ratio
 end
 
 
@@ -126,10 +127,10 @@ function image_utils.loadImage(path, loadSize)
   end
 
   if loadSize then
-    input = image_utils.resize_crop(input, loadSize)
+    input, preserve_aspect_ratio  = image_utils.resize_crop(input, loadSize)
   end
 
-  return input
+  return input, preserve_aspect_ratio
 end
 
 
@@ -166,9 +167,9 @@ function image_utils.loadImage(path, loadSize, aspect_ratio)
     print(#input)
     error('loadImage: not 2-channel or 3-channel image')
   end
-  input = image_utils.resize_crop(input, loadSize, aspect_ratio)
+  input, preserve_aspect_ratio = image_utils.resize_crop(input, loadSize, aspect_ratio)
 
-  return input
+  return input, preserve_aspect_ratio
 end
 
 
@@ -221,7 +222,7 @@ function image_utils.jitter(input, sampleSize, jitter)
   if ok == false then
       print ("sampleSize:", sampleSize)
       print ("w=", input:size(3), "h=", input:size(2), "x:", w1, "y:", h1, "cw:", w1+oW, "ch", h1+oH)
-      error(output)
+      error( string.format("[w1:%d,h1:%d,cw:%d,ch:%d],[sampleSize=%s],[iW:%d,ih:%d][%s]", w1, h1, w1+oW, h1+oH, sampleSize, iW, iH, output))
   end
   assert(output:size(3) == oW)
   assert(output:size(2) == oH)

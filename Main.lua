@@ -197,6 +197,7 @@ local thread_pool = threads.Threads( nthread, function(idx)
                     require 'preprocess'
                     require 'image'
                     require 'math'
+                    require 'preprocess'
 
                     print ("thread init:" .. idx)
                 end,
@@ -241,14 +242,15 @@ function Train(DataC)
                         nsz = catnumsize(param.NumEachSet, catnumsize(size,  param.Resolution))
                         batch:resize(nsz)
 
-                        --print ("batch:resize:", nsz)
                         for j=1,#batchlist do
                             for i=1, param.NumEachSet do
                                 local filename = batchlist[j].names[i]
                                 local jitter = batchlist[j].jitter[i]
                                 local ok, img = pcall(param.LoadImageFunc,filename, jitter)
                                 if ok == false then
-                                    print ("image load error", filename)
+                                    print ('jitter, w1', jitter.w1, 'h1', jitter.h1, 'bFlip', jitter.bFlip, "aspect_ratio", jitter.aspect_ratio)
+                                    print ("image load error", filename, "jitter", jitter)
+                                    print ("error:", img)
                                     return nil
                                 end
 
