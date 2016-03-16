@@ -353,14 +353,19 @@ function Test(DataC)
 end
 
 
+local bestErr = 10000
 local epoch = 1
 print '\n==> Starting Training\n'
 while epoch ~= opt.epoch do
     print('Epoch ' .. epoch)
     local ErrTrain = Train(TrainDataContainer)
-    torch.save(weights_filename, Weights)
+    torch.save(weights_filename .. epoch, Weights)
     print('Training Error = ' .. ErrTrain)
     local ErrTest = Test(TestDataContainer)
+    if bestErr > ErrTest then
+        bestErr = ErrTest
+        torch.save(weights_filename, Weights)
+    end
     print('Test Error = ' .. ErrTest)
     Log:add{['Training Error']= ErrTrain* 100, ['Test Error'] = ErrTest* 100}
     Log:style{['Training Error'] = '-', ['Test Error'] = '-'}
