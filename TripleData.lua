@@ -14,12 +14,6 @@ local TestData
 local TrainData
 local Classes
 local ImagePool = {}
-local shortestAxisNormalLength = 242
-
-function isColorChannel(db, imagename)
-    local d = db.imagepool[db.imagepoolbyname[imagename]]
-    return d:size(1) == 3 and d:dim() == 3
-end
 
 function isColorImage(img)
     if img == nil then
@@ -255,52 +249,8 @@ function GenerateListTriplets(db, size, prefix)
 
         table.insert(list, exemplar)
     end
-    --error("stop test")
     return list
 end
-
-
-function hash_c(c1,c2)
-    return (c1*10 + c2 -10)
-end
-
-function CreateDistanceTensor(data,labels, model)
-    local Rep = ForwardModel(model,data)
-    local Dist = torch.ByteTensor(data:size(1),data:size(1)):zero()
-    for i=1,data:size(1) do
-        for j=i+1,data:size(1) do
-            Dist[i][j] = math.ceil(torch.dist(Rep[i],Rep[j]))
-        end
-    end
-    return Dist
-end
-
---function LoadNormalizedResolutionImage(filename)
---    local imagepath = imagePath .. filename
---
---    print ('loading:' .. imagepath)
---    im = image.load(imagepath)
---    if im == nil then
---        print ("failed to load:" .. imagepath)
---    end
---    --print ("src_width: " .. im:size()[2] )
---    --print ("src_height:" .. im:size()[3] )
---    height = im:size()[2]
---    width = im:size()[3]
---    shortest = math.min(width,height)
---
---    r = shortestAxisNormalLength/shortest
---    d_width = math.ceil(width*r)
---    d_height = math.ceil(height*r)
---    --print ("r:" .. r)
---    im = image.scale(im,d_width,d_height)
---
---    --print ("t_width: " .. im:size()[2] )
---    --print ("t_height:" .. im:size()[3] )
---    im = image.crop(im, 'c', shortestAxisNormalLength, shortestAxisNormalLength)
---    im = im:add(-128):div(128)
---    return im
---end
 
 function countTableSize(table)
     local n = 0
@@ -310,7 +260,7 @@ function countTableSize(table)
     return n
 end
 
-function LoadData(filepath)
+function LoadData(filepath, check_imagefile)
     local Data = {data={},imagepool={}}
     local positive_pairs = {}
     local negative_pairs = {}
@@ -320,39 +270,36 @@ function LoadData(filepath)
     local ImagePool = {}
     local count_imagepool = 0
     local ImagePoolByName = {}
+    local check_imagefile = check_imagefile or false
 
     label_pairs = csvigo.load( {path=DataPath .. filepath, mode='large'} )
 
     --for i=1,#label_pairs,1000 do
     for i=1,#label_pairs do
         m = label_pairs[i]
-        local a_name = m[2]
-        local t_name = m[3]
-        local p_or_n = m[4]
+        local a_name = m[1]
+        local t_name = m[2]
+        local p_or_n = m[3]
         local bcontinue = false
 
-        bcontinue = false
-
         if a_name ~= t_name and a_name ~= nil then
-            --print ("anchor_name=", a_name)
-            if ImagePoolByName[a_name] == nil then
-                local img = LoadNormalizedResolutionImage(a_name)
-                if isColorImage(img) then
-                    count_imagepool = count_imagepool + 1
-                    ImagePoolByName[a_name] = true
-                else
-                    --print("ancnor continue")
-                    bcontinue = true
+            bcontinue = false
+            if check_imagefile then
+                if ImagePoolByName[a_name] == nil then
+                    local img = LoadNormalizedResolutionImage(a_name)
+                    if isColorImage(img) then
+                        ImagePoolByName[a_name] = true
+                    else
+                        bcontinue = true
+                    end
                 end
-            end
-            if ImagePoolByName[t_name] == nil then
-                local img = LoadNormalizedResolutionImage(t_name)
-                if isColorImage(img) then
-                    count_imagepool = count_imagepool + 1
-                    ImagePoolByName[t_name] = true
-                else
-                    --print("positive continue")
-                    bcontinue = true
+                if ImagePoolByName[t_name] == nil then
+                    local img = LoadNormalizedResolutionImage(t_name)
+                    if isColorImage(img) then
+                        ImagePoolByName[t_name] = true
+                    else
+                        bcontinue = true
+                    end
                 end
             end
 
@@ -375,111 +322,23 @@ function LoadData(filepath)
                         table.insert(negative_pairs[a_name], t_name )
                     end
                 end
-                --print ("positive_pair", #positive_pairs)
-                --print ("negative_pair", #negative_pairs)
             else
                 print ("continue")
             end
         end
-        print (i, #label_pairs, 100.0*(i/#label_pairs), count_imagepool, "anchor", #anchor_name_list)
+        print (i, #label_pairs, 100.0*(i/#label_pairs), "anchor", #anchor_name_list)
     end
 
     print("loaded: " .. #anchor_name_list)
     print("loaded imagepool: " .. #ImagePool)
-    Data.data.anchor_name_to_idx = anchor_name_to_idx
     Data.data.anchor_name_list = anchor_name_list
     Data.data.positive = positive_pairs
     Data.data.negative = negative_pairs
+    Data.Resolution = {3,299,299}
+
+    print ("Data Size:", #Data.data.anchor_name_list)
 
     return Data
-end
-
-function SplitTrainValidData(Data)
-    local TrainData = {data={}}
-    local TestData = {data={}}
-
-    local train_anchor_name_list = {}
-    local test_anchor_name_list = {}
-    local positive_cnt = 0
-
-    -- split positive
-    for i=1, #Data.data.anchor_name_list do
-        local anchor_name = Data.data.anchor_name_list[i]
-        local pos_of_anchor = Data.data.positive[anchor_name] 
-        if pos_of_anchor ~= nil then
-            if positive_cnt >= 10 then
-                positive_cnt = 0
-                table.insert(test_anchor_name_list, Data.data.anchor_name_list[i])
-            else
-                positive_cnt = positive_cnt + 1
-                table.insert(train_anchor_name_list, Data.data.anchor_name_list[i])
-            end
-        end
-    end
-
-    print ( string.format("split data=T(%d),%d", #train_anchor_name_list, #test_anchor_name_list) )
-
-    TrainData.data.anchor_name_list = train_anchor_name_list
-    TrainData.data.positive = Data.data.positive
-    TrainData.data.negative = Data.data.negative
-    TrainData.data.all_negative_list = Data.NegativeList
-    TrainData.Resolution = {3, 299, 299}
-
-    TestData.data.anchor_name_list = test_anchor_name_list
-    TestData.data.positive = Data.data.positive
-    TestData.data.negative = Data.data.negative
-    TestData.data.all_negative_list = Data.NegativeList
-    TestData.Resolution = {3, 299, 299}
-
-    print ("Train Data size:", #TrainData.data.anchor_name_list)
-    print ("Test Data size:", #TestData.data.anchor_name_list)
-
-    return TrainData, TestData
-end
-
-function SplitData(Data)
-    local TrainData = {data={}}
-    local TestData = {data={}}
-
-    local train_anchor_name_list = {}
-    local test_anchor_name_list = {}
-    local positive_cnt = 0
-
-    -- split positive
-    for i=1, #Data.data.anchor_name_list do
-        local anchor_name = Data.data.anchor_name_list[i]
-        local pos_of_anchor = Data.data.positive[anchor_name] 
-        if pos_of_anchor ~= nil then
-            if positive_cnt >= 10 then
-                positive_cnt = 0
-                table.insert(test_anchor_name_list, Data.data.anchor_name_list[i])
-            else
-                positive_cnt = positive_cnt + 1
-                table.insert(train_anchor_name_list, Data.data.anchor_name_list[i])
-            end
-        end
-    end
-
-    print ( string.format("split data=T(%d),%d", #train_anchor_name_list, #test_anchor_name_list) )
-
-    TrainData.data.anchor_name_to_idx = Data.data.anchor_name_to_idx
-    TrainData.data.anchor_name_list = train_anchor_name_list
-    TrainData.data.positive = Data.data.positive
-    TrainData.data.negative = Data.data.negative
-    TrainData.data.all_negative_list = Data.NegativeList
-    TrainData.Resolution = {3, 299, 299}
-
-    TestData.data.anchor_name_list = test_anchor_name_list
-    TestData.data.anchor_name_to_idx = Data.data.anchor_name_to_idx
-    TestData.data.positive = Data.data.positive
-    TestData.data.negative = Data.data.negative
-    TestData.data.all_negative_list = Data.NegativeList
-    TestData.Resolution = {3, 299, 299}
-
-    print ("Train Data size:", #TrainData.data.anchor_name_list)
-    print ("Test Data size:", #TestData.data.anchor_name_list)
-
-    return TrainData, TestData
 end
 
 function save_data()
@@ -520,8 +379,23 @@ function load_cached_data()
     return { TrainData = TrainData, TestData = TestData }
 end
 
-function LoadNegativeData(negative_filepath)
+function FilterOutEmptyPositive(Data)
+    local filtered_anchor = {}
+    for i=1,#Data.data.anchor_name_list do
+        local anchor_name = Data.data.anchor_name_list[i]
+        local pos_of_anchor = Data.data.positive[anchor_name] 
+        if pos_of_anchor ~= nil then
+            table.insert(filtered_anchor,anchor_name)
+        end
+    end
 
+    print ("#anchorlist", #Data.data.anchor_name_list, "-> #filtered list", #filtered_anchor)
+    Data.data.anchor_name_list = filtered_anchor
+
+    return Data
+end
+
+function LoadNegativeData(negative_filepath)
     print (string.format( DataPath .. negative_filepath ) )
     local negative_namelist = {}
     negative_list = csvigo.load( {path=DataPath .. negative_filepath, mode='large'} )
@@ -542,40 +416,11 @@ end
 
 --save_filename = PreProcDir .. '/fashion_data.t7' 
 save_filename = PreProcDir .. '/fashion_save.t7' 
-rawdata_filename = PreProcDir .. '/fashion_rawdata.t7' 
 
-print ("=========")
-
-local Data = {}
-Data.cached = false
-if path.exists(rawdata_filename) then
-    print (string.format("load cached raw file: %s", rawdata_filename) )
-    Data = torch.load( rawdata_filename )
-    Data.cached = true
-else
-    Data = LoadData('fashion_pair.csv')
-    torch.save( rawdata_filename, Data )
-    Data.cached = false
-end
-
-TrainData, TestData = SplitData(Data)
-TrainData, ValidData = SplitTrainValidData(TrainData)
-
---print ("check chached file:" .. save_filename)
---if path.exists(save_filename) ~= false then
---    print ("cached model")
---    --Data = torch.load(save_filename )
---    Data = load_cached_data()
---
---    print ("Train Data size:", #Data.TrainData.data.anchor_name_list)
---    print ("Test Data size:", #Data.TestData.data.anchor_name_list)
---    return Data
---end
---
---local Data = LoadData('fashion_pair.csv')
 local NegativeList = {}
 negative_cache_filename = PreProcDir .. '/negative_list.t7'
 if path.exists(negative_cache_filename) then
+    print ("load cached negative data")
     NegativeList = torch.load(negative_cache_filename)
     NegativeList.cache = true
 else
@@ -584,13 +429,28 @@ else
     NegativeList.cache = false
 end 
 
-Data.NegativeList = NegativeList
-TrainData, TestData = SplitData(Data)
-RetData= {TrainData=TrainData, TestData=TestData}
+print ("#negative_list: ", #NegativeList)
+if path.exists(save_filename) then
+    print ("load cached train/validation data")
+    RetData = load_cached_data()
+    RetData.cache = true
+else
+    TrainData = LoadData('fashion_pair_train.csv', false)
+    TestData = LoadData('fashion_pair_valid.csv', false)
+    TrainData.data.all_negative_list = NegativeList
+    TestData.data.all_negative_list = NegativeList
+    RetData= {TrainData=TrainData, TestData=TestData}
+    RetData.cache = false
+end
+
+RetData.TrainData = FilterOutEmptyPositive(RetData.TrainData)
+RetData.TestData = FilterOutEmptyPositive(RetData.TestData)
 
 print ('save:' .. save_filename)
-torch.save( save_filename, RetData)
-save_data()
+if RetData.cache == false then
+    torch.save( save_filename, RetData)
+    save_data()
+end
 
 print ("return")
 
