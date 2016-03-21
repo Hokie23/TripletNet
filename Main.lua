@@ -82,7 +82,7 @@ end
 local EmbeddingNet = require(opt.network)
 local TripletNet = nn.TripletNet2(EmbeddingNet)
 --local Loss = nn.DistanceRatioCriterion()
-local Loss = nn.TripletEmbeddingCriterion(1.0)
+local Loss = nn.TripletEmbeddingCriterion(0.2)
 TripletNet:cuda()
 Loss:cuda()
 

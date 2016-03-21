@@ -31,7 +31,7 @@ end
 
 function loadutils:LoadNormalizedResolutionImage(filename, jitter)
     local imagepath = self.defaultPath .. filename
-    print ("image path", imagepath)
+    --print ("image path", imagepath)
     if jitter == nil then
         return preprocess(imagepath)
     else
