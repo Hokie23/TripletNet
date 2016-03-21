@@ -272,6 +272,7 @@ function image_utils.center_crop(input, sampleSize)
   local w1 = math.ceil((iW-oW)/2)
   local h1 = math.ceil((iH-oH)/2)
   local output = image.crop(input, w1, h1, w1+oW, h1+oW)
+
   return output
 end
 

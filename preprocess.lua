@@ -11,6 +11,14 @@ local cnn_model_std =
 local loadSize = {3, 342, 342}
 local sampleSize = {3, 299, 299}
 
+function GetLoadSize()
+    return loadSize
+end
+
+function GetSampleSize()
+    return sampleSize
+end
+
 function preprocess(image_file_path)
     local ok, input, aspect_ratio = pcall(image_utils.loadImage,image_file_path, loadSize)
     if ok == false then

@@ -12,7 +12,6 @@ require 'WorkerParam'
 
 ----------------------------------------------------------------------
 
-
 cmd = torch.CmdLine()
 cmd:addTime()
 cmd:text()
@@ -27,7 +26,7 @@ cmd:option('-network',            'resception.lua',            'embedding networ
 cmd:option('-LR',                 0.001,                    'learning rate')
 cmd:option('-LRDecay',            1e-6,                   'learning rate decay (in # samples)')
 cmd:option('-weightDecay',        1e-4,                   'L2 penalty on the weights')
-cmd:option('-momentum',           0.9,                    'momentum')
+cmd:option('-momentum',           0.95,                    'momentum')
 -- cmd:option('-batchSize',          128,                    'batch size')
 -- cmd:option('-batchSize',          1,                    'batch size')
 --cmd:option('-batchSize',          8,                    'batch size')
@@ -80,7 +79,6 @@ end
 
 ----------------------------------------------------------------------
 -- Model + Loss:
-
 local EmbeddingNet = require(opt.network)
 local TripletNet = nn.TripletNet2(EmbeddingNet)
 --local Loss = nn.DistanceRatioCriterion()
@@ -90,16 +88,16 @@ Loss:cuda()
 
 
 local Weights, Gradients = TripletNet:getParameters()
+local EmbeddingWeights, EmbeddingGradients = EmbeddingNet:getParameters()
 
 if paths.filep(opt.load) then
     local w = torch.load(opt.load)
-    print('Loaded')
+    print('Loaded', opt.load)
     Weights:copy(w)
 end
 
 --TripletNet:RebuildNet() --if using TripletNet instead of TripletNetBatch
 
--- local data = require 'Data'
 local data = require 'TripleData'
 local SizeTrain = opt.size or 640000
 --local SizeTest = SizeTrain*0.1
@@ -111,12 +109,14 @@ local SizeTest = 6400
 os.execute('mkdir -p ' .. opt.save)
 os.execute('cp ' .. opt.network .. '.lua ' .. opt.save)
 cmd:log(opt.save .. '/Log.txt', opt)
+local network_filename = paths.concat(opt.save, "Embedding.t7")
 local weights_filename = paths.concat(opt.save, 'Weights.t7')
 local log_filename = paths.concat(opt.save,'ErrorProgress')
 local Log = optim.Logger(log_filename)
 Log.showPlot = false
-----------------------------------------------------------------------
 
+
+----------------------------------------------------------------------
 print '==> Embedding Network'
 print(EmbeddingNet)
 print '==> Triplet Network'
@@ -124,10 +124,7 @@ print(TripletNet)
 print '==> Loss'
 print(Loss)
 
-print( "LoadNormalizedResolutionImage():", LoadNormalizedResolutionImage)
-
 ---------------------------------------------------------------------
-
 function ReGenerateTrain(net, selection_mode)
     if selection_mode then
         return GenerateListTriplets(data.TrainData,SizeTrain, "train")
@@ -137,7 +134,7 @@ function ReGenerateTrain(net, selection_mode)
     end
 end
 
-local TestList = GenerateListTriplets(data.TestData,SizeTest, "prefix")
+local TestList = GenerateListTriplets(data.TestData,SizeTest, "test")
 
 local TrainDataContainer = DataContainer{
     Data = data.TrainData.data,
@@ -198,6 +195,7 @@ local thread_pool = threads.Threads( nthread, function(idx)
                     require 'image'
                     require 'math'
                     require 'preprocess'
+                    require 'loadutils'
 
                     print ("thread init:" .. idx)
                 end,
@@ -205,7 +203,7 @@ local thread_pool = threads.Threads( nthread, function(idx)
                     print ("set data: " .. idx)
                 end)
                 
-function Train(DataC)
+function Train(DataC, epoch)
     print ("RunTrain")
     local err = 0
     local num = 0
@@ -247,6 +245,7 @@ function Train(DataC)
                                 local filename = batchlist[j].names[i]
                                 local jitter = batchlist[j].jitter[i]
                                 local ok, img = pcall(param.LoadImageFunc,filename, jitter)
+                                assert(img ~= nil)
                                 if ok == false then
                                     print ('jitter, w1', jitter.w1, 'h1', jitter.h1, 'bFlip', jitter.bFlip, "aspect_ratio", jitter.aspect_ratio)
                                     print ("image load error", filename, "jitter", jitter)
@@ -262,6 +261,7 @@ function Train(DataC)
                     end,
                     function (x)
                         if x == nil then
+                            print ('x is nil')
                             return
                         end
 
@@ -272,7 +272,7 @@ function Train(DataC)
                         --print("y:", y)
 
                         -- print( "lerr: ", lerr*100.0/y[1]:size(1) )
-                        print( string.format("Train lerr: %e", lerr ) )
+                        print( string.format("[epoch #%d]: Train lerr: %e", epoch, lerr ) )
 
                         err = err + lerr
                         xlua.progress(num*DataC.BatchSize, DataC:size()*nepoch)
@@ -291,7 +291,7 @@ function Train(DataC)
     return (err/num)
 end
 
-function Test(DataC)
+function Test(DataC, epoch)
     print ("RunTest")
     thread_pool:synchronize()
     DataC:Reset()
@@ -337,7 +337,7 @@ function Test(DataC)
                     local y = TripletNet:forward({x[1],x[2],x[3]})
                     local lerr = ErrorCount(y)
                     --print( "Test lerr: ", lerr*100.0/y[1]:size(1) )
-                    print( string.format("Test lerr: %e", lerr ) )
+                    print( string.format("[epoch:%d]: Test lerr: %e", epoch, lerr ) )
                     err = err + lerr
                     xlua.progress(num*DataC.BatchSize, DataC:size())
                     num = num +1
@@ -358,14 +358,18 @@ local epoch = 1
 print '\n==> Starting Training\n'
 while epoch ~= opt.epoch do
     print('Epoch ' .. epoch)
-    local ErrTrain = Train(TrainDataContainer)
+    local ErrTrain = Train(TrainDataContainer, epoch)
+    torch.save(network_filename .. epoch, EmbeddingNet)
     torch.save(weights_filename .. epoch, Weights)
     print('Training Error = ' .. ErrTrain)
-    local ErrTest = Test(TestDataContainer)
+    local ErrTest = Test(TestDataContainer, epoch)
     if bestErr > ErrTest then
         bestErr = ErrTest
+        torch.save(network_filename, EmbeddingNet)
         torch.save(weights_filename, Weights)
+        torch.save(weights_filename .. 'embedding.t7', EmbeddingWeights)
     end
+
     print('Test Error = ' .. ErrTest)
     Log:add{['Training Error']= ErrTrain* 100, ['Test Error'] = ErrTest* 100}
     Log:style{['Training Error'] = '-', ['Test Error'] = '-'}

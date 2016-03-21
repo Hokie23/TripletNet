@@ -1,7 +1,7 @@
 require "csvigo"
 require 'image'
 require 'math'
-require 'preprocess'
+require 'loadutils'
 
 local opt = opt or {}
 local PreProcDir = opt.preProcDir or './'
@@ -14,30 +14,16 @@ local TestData
 local TrainData
 local Classes
 local ImagePool = {}
-
-function isColorImage(img)
-    if img == nil then
-        return false
-    end
-    return img:size(1) == 3 and img:dim() == 3
-end
-
-function LoadNormalizedResolutionImage(filename, jitter)
-    --print ("loading...", filename)
-    local imagepath = imagePath .. filename
-    if jitter == nil then
-        return preprocess(imagepath)
-    else
-        return preprocess_with_jitter(imagepath, jitter)
-    end
-end
-
-
+local lu = loadutils(imagePath )
 
 function dist(a, b)
     local d = (a -b)*(a-b)
     return d
     --return torch.dist(a,b)
+end
+
+function LoadNormalizedResolutionImage(filename, jitter)
+    return lu:LoadNormalizedResolutionImage(filename, jitter)
 end
 
 function SelectListTriplets(embedding_net, db, size, TensorType)
