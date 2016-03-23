@@ -29,7 +29,7 @@ local distance_pair_file = project .. '.csv'
 
 local distance_pair = csvigo.load( {path=distance_pair_file, mode='large'} )
 
-print ('#loaded:', #distance_pair)
+--print ('#loaded:', #distance_pair)
 local max_bin = 1000
 local pos_histogram = {}
 local neg_histogram = {}
@@ -44,7 +44,7 @@ for i=1,#distance_pair do
     m = distance_pair[i]
     d = (tonumber( m[4] ) / 2.0)*max_bin
     dbin = math.floor(d) + 1
-    print ("dbin", dbin)
+    --print ("dbin", dbin)
     if m[3] == 'true' then
         pos_histogram[dbin] = pos_histogram[dbin] + 1
         total_sum[1] = total_sum[1] + 1
@@ -66,13 +66,41 @@ for i=1,max_bin do
     table.insert(xbin, (i-1)/1000*2)
 end
 
-print ("xbin", xbin)
+local xbin = torch.Tensor(xbin)
+local pos_histogram = torch.Tensor(pos_histogram)/total_sum[1]
+local neg_histogram = torch.Tensor(neg_histogram)/total_sum[2]
+--print ("xbin", xbin)
 
-x = torch.linspace(-2*math.pi,2*math.pi)
 gnuplot.svgfigure(project .. '_histogram.svg')
-gnuplot.plot('Cos',x/math.pi,torch.cos(x),'~')
---gnuplot.plot('Postivie', torch.Tensor(xbin), torch.Tensor(pos_histogram), '~')
-gnuplot.plot({'Positive', torch.Tensor(xbin), torch.Tensor(pos_histogram)/total_sum[1], '-'}, {'Negative', torch.Tensor(xbin), torch.Tensor(neg_histogram)/total_sum[2], '-'})
+gnuplot.plot({'Positive', xbin, pos_histogram, '-'}, {'Negative', xbin, neg_histogram, '-'})
 gnuplot.plotflush()
 
+local p_mu = xbin * pos_histogram
+local n_mu = xbin * neg_histogram
+
+print ("project", project, "p_mu", p_mu, "n_mu", n_mu, 'diff', n_mu - p_mu)
+
+function _DKL(p, q)
+    local cPQ = torch.Tensor( q:size(1))
+    local cQ = q:clone()
+    local cP = p:clone()
+
+    local i = 0
+    cPQ:map2(cP, cQ, function (x, p, q)
+                if p== 0 or q == 0 then
+                    return 0
+                else
+                    return torch.log(p/q)
+                end
+            end)
+
+    local s = cP * cPQ
+    return s
+end
+
+function DistKL(p, q)
+    return _DKL(p,q) + _DKL(q,p)
+end
+
+print ("KL Divergence", DistKL(pos_histogram, neg_histogram))
 

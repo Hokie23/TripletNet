@@ -13,3 +13,8 @@
         Grid는 타당성이 적어 보인다? 이유는 center alignment가 적다.
         Object detector의 alignment을 시켜서 했을 경우는 어떠한가?
         Object detector + Grid Concept을 하였을 경우는 어떠한가?
+
+
+2016.3.23
+    512 dim 일경우, 0.03의 기대값의 차이가 난다.
+    KL-Divergence로 두 확률 분포도의 차이를 계산해 보자.
