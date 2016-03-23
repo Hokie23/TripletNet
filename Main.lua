@@ -22,7 +22,8 @@ cmd:text('==>Options')
 cmd:text('===>Model And Training Regime')
 cmd:option('-modelsFolder',       './Models/',            'Models Folder')
 -- cmd:option('-network',            'Model.lua',            'embedding network file - must return valid network.')
-cmd:option('-network',            'resception_512.lua',            'embedding network file - must return valid network.')
+-- cmd:option('-network',            'resception_512.lua',            'embedding network file - must return valid network.')
+cmd:option('-network',            'resception_1024.lua',            'embedding network file - must return valid network.')
 cmd:option('-LR',                 0.001,                    'learning rate')
 cmd:option('-LRDecay',            1e-6,                   'learning rate decay (in # samples)')
 cmd:option('-weightDecay',        1e-4,                   'L2 penalty on the weights')
@@ -361,7 +362,7 @@ while epoch ~= opt.epoch do
     local ErrTrain = Train(TrainDataContainer, epoch)
     torch.save(network_filename .. epoch, EmbeddingNet)
     torch.save(weights_filename .. epoch, Weights)
-    print('Training Error = ' .. ErrTrain)
+    print( string.format('[epoch #%d] Training Error = %f', epoch,  ErrTrain) )
     local ErrTest = Test(TestDataContainer, epoch)
     if bestErr > ErrTest then
         bestErr = ErrTest
@@ -370,7 +371,7 @@ while epoch ~= opt.epoch do
         torch.save(weights_filename .. 'embedding.t7', EmbeddingWeights)
     end
 
-    print('Test Error = ' .. ErrTest)
+    print( string.format('[epoch #%d] Test Error = %f', epoch, ErrTest) )
     Log:add{['Training Error']= ErrTrain* 100, ['Test Error'] = ErrTest* 100}
     Log:style{['Training Error'] = '-', ['Test Error'] = '-'}
     Log:plot()

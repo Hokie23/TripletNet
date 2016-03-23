@@ -17,9 +17,13 @@ local ImagePool = {}
 local lu = loadutils(imagePath )
 
 function dist(a, b)
-    local d = (a -b)*(a-b)
+    --local d = (a -b)*(a-b)
+    --return d:pow(0.5)
+    local ok, d = pcall(torch.dist,a,b)
+    if ok == false then
+        error(d)
+    end
     return d
-    --return torch.dist(a,b)
 end
 
 function LoadNormalizedResolutionImage(filename, jitter)
@@ -97,14 +101,23 @@ function SelectListTriplets(embedding_net, db, size, TensorType)
 
                 positive_vector = embedding_net:forward( batch )
                 local max_pdist = -1 
-                for pi=1,minbatchSize do
-                    bdist = dist(anchor_vector, positive_vector[pi])
-                    --print ("positive_dist", bdist)
-                    if bdist > max_pdist then
-                        max_pdist = bdist
-                        hard_positive_name = batch_name[pi]
-                        positive_jitter = batch_jitter[pi]
-                        --print ("positive_dist", bdist)
+                if minbatchSize == 1 then
+                    ok, bdist = pcall(dist,anchor_vector, positive_vector)
+                    if ok == false then
+                        print ("******:", minbatchSize )
+                        print("positive error:", positive_vector:size())
+                    end
+                    max_pdist = bdist
+                    hard_positive_name = batch_name[1]
+                    positive_jitter = batch_jitter[1]
+                else
+                    for pi=1,minbatchSize do
+                        ok, bdist = pcall(dist,anchor_vector, positive_vector)
+                        if bdist > max_pdist then
+                            max_pdist = bdist
+                            hard_positive_name = batch_name[pi]
+                            positive_jitter = batch_jitter[pi]
+                        end
                     end
                 end
 

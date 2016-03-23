@@ -1,0 +1,15 @@
+2016.3.21. 
+    Distance값이 생각보다 큰 범위가 나온다. 이 부분의 타당성을 체크해 보자.
+    3.22    정규화는 정확하게 되었다.
+2016.3.21. 
+    Failed) 거리 계산 통계를 낼때 network을 test모드로 하지 않았다. 
+        ex) PM 8:11에 데이터 시작--> inter- vs. intra- class의 거리차가 발생했으면 좋겠다.
+        3.22    확실히 test 모드의 버그였다.
+                큰 수치는 아니지만 두 값의 차이를 갇는 히스토그램을 만들었다.
+2016.3.22
+    512 dim이 128 dim보다 distinctiveness을 더 준다.
+    Next Check Point?
+        1024로 하였을 경우 distinctiveness을 더 줄 것인가?
+        Grid는 타당성이 적어 보인다? 이유는 center alignment가 적다.
+        Object detector의 alignment을 시켜서 했을 경우는 어떠한가?
+        Object detector + Grid Concept을 하였을 경우는 어떠한가?
