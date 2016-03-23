@@ -1,10 +1,11 @@
-require 'SiameseDistanceNet'
+require ('mobdebug').start()
 require "csvigo"
 require 'cutorch'
+require 'cunn'
 require 'xlua'
 require 'trepl'
-require 'cunn'
 require 'loadutils'
+require 'SiameseDistanceNet'
 
 ----------------------------------------------------------------------
 
@@ -16,9 +17,12 @@ cmd:text()
 cmd:text('==>Options')
 
 cmd:text('===>Model And Training Regime')
---cmd:option('-modelsFolder',       './Results/ThuMar1712:51:352016/',            'Models Folder')
-cmd:option('-modelsFolder',       './Results/TueMar1515:07:552016/',            'Models Folder')
-cmd:option('-network',            'resception.lua',            'embedding network file - must return valid network.')
+--cmd:option('-modelsFolder',       './Results/TueMar1515:07:552016/',            'Models Folder') -- 128 The best model
+--cmd:option('-network',            'resception.lua',            'embedding network file - must return valid network.')
+
+cmd:option('-modelsFolder',       './Results/MonMar2116:45:482016/',            'Models Folder') -- 512 model
+--cmd:option('-network',            'Embedding.t76',            'embedding network file - must return valid network.')
+cmd:option('-network',            'Embedding.t719',            'embedding network file - must return valid network.')
 
 cmd:text('===>Platform Optimization')
 cmd:option('-batchSize',          16,                    'batch size')
@@ -45,18 +49,25 @@ lu = loadutils(opt.imagePath)
 
 ----------------------------------------------------------------------
 -- Model + Loss:
-print ("load...", opt.load)
-local w = torch.load( opt.load )
 print ("load...", opt.network)
-local EmbeddingNet = require(opt.network)
+--local EmbeddingNet = require(opt.network)
+require 'cudnn'
+local EmbeddingNet = torch.load(opt.network)
+print ('complete')
 
 EmbeddingNet:cuda()
 local EmbeddingWeights, EmbeddingGradients = EmbeddingNet:getParameters()
-EmbeddingWeights:copy(w)
+if opt.load ~= '' then
+    print ("load...", opt.load)
+    local w = torch.load( opt.load )
+    EmbeddingWeights:copy(w)
+end
+EmbeddingNet:evaluate()
 
 print ("EmbeddingNet:", EmbeddingNet)
 local SiameseDistanceNet = nn.SiameseDistanceNet(EmbeddingNet)
 SiameseDistanceNet:cuda()
+SiameseDistanceNet:evaluate()
 
 ------------------------- Output files configuration -----------------
 os.execute('mkdir -p ' .. opt.save)
@@ -108,6 +119,14 @@ function CalculateDistance()
         end
 
         batch:cuda()
+
+        --local f = EmbeddingNet:forward( batch[1] )
+        --s = f:pow(2.0):sum(2):pow(0.5)
+        --for j=1,s:size(1) do
+        --    if s[j][1] ~= 1.0 then
+        --        print (s)
+        --    end
+        --end
 
         local y = SiameseDistanceNet:forward( {batch[1], batch[2]} )
 
