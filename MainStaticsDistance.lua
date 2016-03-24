@@ -17,15 +17,15 @@ cmd:text()
 cmd:text('==>Options')
 
 cmd:text('===>Model And Training Regime')
---cmd:option('-modelsFolder',       './Results/TueMar1515:07:552016/',            'Models Folder') -- 128 The best model
---cmd:option('-network',            'resception.lua',            'embedding network file - must return valid network.')
+cmd:option('-modelsFolder',       './Results/WedMar2314:56:452016/',            'Models Folder') -- 128 The best model
+cmd:option('-network',            'Embedding.t71',            'embedding network file - must return valid network.')
 
 --cmd:option('-modelsFolder',       './Results/MonMar2116:45:482016/',            'Models Folder') -- 512 model
-----cmd:option('-network',            'Embedding.t76',            'embedding network file - must return valid network.')
---cmd:option('-network',            'Embedding.t719',            'embedding network file - must return valid network.')
+--cmd:option('-network',            'Embedding.t76',            'embedding network file - must return valid network.')
+--cmd:option('-network',            'Embedding.t722',            'embedding network file - must return valid network.')
 
-cmd:option('-modelsFolder',       './Results/TueMar2220:13:462016/',            'Models Folder') -- 512 model
-cmd:option('-network',            'Embedding.t78',            'embedding network file - must return valid network.')
+--cmd:option('-modelsFolder',       './Results/TueMar2220:13:462016/',            'Models Folder') -- 512 model
+--cmd:option('-network',            'Embedding.t78',            'embedding network file - must return valid network.')
 
 cmd:text('===>Platform Optimization')
 cmd:option('-batchSize',          16,                    'batch size')
@@ -56,6 +56,7 @@ print ("load...", opt.network)
 --local EmbeddingNet = require(opt.network)
 require 'cudnn'
 local EmbeddingNet = torch.load(opt.network)
+print ("EmbeddingNet:", EmbeddingNet)
 print ('complete')
 
 EmbeddingNet:cuda()
@@ -67,7 +68,6 @@ if opt.load ~= '' then
 end
 EmbeddingNet:evaluate()
 
-print ("EmbeddingNet:", EmbeddingNet)
 local SiameseDistanceNet = nn.SiameseDistanceNet(EmbeddingNet)
 SiameseDistanceNet:cuda()
 SiameseDistanceNet:evaluate()
