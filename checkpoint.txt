@@ -38,3 +38,6 @@
 2016. 3. 28. 
     Feature를 추출하는 코드를 작성하자!
 
+2016. 3. 28.
+    Feature Folder List
+        512: Results/MonMar2116:45:482016

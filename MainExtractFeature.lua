@@ -16,7 +16,7 @@ cmd:text('==>Options')
 cmd:option('-batch_list', '/data1/october_11st/batch_list', 'batch list')
 cmd:option('-output_list', '', 'write to result')
 cmd:option('-model', '', 'model file name')
-cmd:option('-batchSize',          2,                    'batch size')
+cmd:option('-batchSize',          32,                    'batch size')
 cmd:option('-cache', true, 'cache batch list')
 
 opt = cmd:parse(arg or {})
