@@ -19,6 +19,11 @@ function GetSampleSize()
     return sampleSize
 end
 
+function preprocess_mean_std_norm(input)
+    output = image_utils.mean_std_norm(input, cnn_model_mean, cnn_model_std)
+    return output
+end
+
 function preprocess(image_file_path)
     local ok, input, aspect_ratio = pcall(image_utils.loadImage,image_file_path, loadSize)
     if ok == false then

@@ -17,8 +17,8 @@ cmd:text()
 cmd:text('==>Options')
 
 cmd:text('===>Model And Training Regime')
-cmd:option('-modelsFolder',       './Results/WedMar2314:56:452016/',            'Models Folder') -- 128 The best model
-cmd:option('-network',            'Embedding.t71',            'embedding network file - must return valid network.')
+--cmd:option('-modelsFolder',       './Results/WedMar2314:56:452016/',            'Models Folder') -- 128 The best model
+--cmd:option('-network',            'Embedding.t715',            'embedding network file - must return valid network.')
 
 --cmd:option('-modelsFolder',       './Results/MonMar2116:45:482016/',            'Models Folder') -- 512 model
 --cmd:option('-network',            'Embedding.t76',            'embedding network file - must return valid network.')
@@ -27,8 +27,11 @@ cmd:option('-network',            'Embedding.t71',            'embedding network
 --cmd:option('-modelsFolder',       './Results/TueMar2220:13:462016/',            'Models Folder') -- 512 model
 --cmd:option('-network',            'Embedding.t78',            'embedding network file - must return valid network.')
 
+cmd:option('-modelsFolder',       './Results/WedMar2319:55:362016/',            'Models Folder') -- 1024(relu) model
+cmd:option('-network',            'Embedding.t78',            'embedding network file - must return valid network.')
+
 cmd:text('===>Platform Optimization')
-cmd:option('-batchSize',          16,                    'batch size')
+cmd:option('-batchSize',          10,                    'batch size')
 cmd:option('-threads',            16,                      'number of threads')
 cmd:option('-type',               'cuda',                 'float or cuda')
 cmd:option('-devid',              1,                      'device ID (if using CUDA)')
