@@ -61,6 +61,7 @@ function loadutils:LoadNormalizedResolutionImageCenterCrop(filename)
 
     if output == nil then
         print ("output is nil")
+        return nil
     end
 
     output = preprocess_mean_std_norm(output)
