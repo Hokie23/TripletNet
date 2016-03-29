@@ -41,3 +41,5 @@
 2016. 3. 28.
     Feature Folder List
         512: Results/MonMar2116:45:482016
+        128D: Results/WedMar2314:56:452016
+        1024D: Results/WedMar2319:55:362016

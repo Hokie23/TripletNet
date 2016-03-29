@@ -60,6 +60,7 @@ print ("nsz", nsz)
 batch:resize(nsz)
 
 local current_batch =0
+local batch_info = {}
 
 local replacePath = "/data1/october_11st/october_11st_imgs/"
 for i=1,#batch_items do
@@ -68,6 +69,7 @@ for i=1,#batch_items do
     local img = lu:LoadNormalizedResolutionImageCenterCrop(imagepath)
 
     if img ~= nil  then
+        table.insert( batch_info, {content_id,mid_category,category_name,imagepath} )
         current_batch = current_batch + 1
         batch[current_batch]:copy(img)
 
@@ -81,11 +83,17 @@ for i=1,#batch_items do
                 for yi=2,y:size(2) do
                     feature = feature .. "," .. string.format("%f", y[j][yi])
                 end
-                output_file:write(string.format("%s\t%s\t%s\t%s\t%s\n", content_id, mid_category, category_name, imagepath:gsub(replacePath, ''), feature ) )
+
+                local info = batch_info[j]
+
+                local onlyfilename = info[4]:gsub(replacePath,'')
+                output_file:write(string.format("%s\t%s\t%s\t%s\t%s\n", info[1], info[2], info[3], onlyfilename, feature ) )
             end
 
             io.flush(output_file)
             xlua.progress(i, #batch_items)
+
+            batch_info = {}
         end
     end
 end
