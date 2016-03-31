@@ -2,10 +2,10 @@ local curl = require('luacurl')
 local http = require('socket.http')
 local ltn12 = require('ltn12')
 
-function HTTPRequest(url)
+function HTTPRequest(request_method, url)
     local body = {}
     local client, code, headers, status = http.request( {
-        method='GET',
+        method=request_method,
         url=url,
         sink=ltn12.sink.table(body)
         })

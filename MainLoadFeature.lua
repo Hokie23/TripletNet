@@ -3,11 +3,16 @@ require 'cutorch'
 require 'cunn'
 require 'cudnn'
 require 'xlua'
+require 'loadutils'
 require "stringutils"
 require 'webutils'
+require "xlua"
+
+local json = require('JSON.lua')
 
 local app = require('waffle')
 local async = require('async')
+local lu = loadutils('')
 
 
 async.repl()
@@ -21,6 +26,7 @@ cmd:text('Extracting a feature on Fashion')
 cmd:text()
 cmd:text('==>Options')
 cmd:option('-dim', 128, 'model dimension')
+cmd:option('-batch', 1024*50, 'compare batch size')
 cmd:option('-max_feature', 2000000, 'model dimension')
 cmd:option('-feature_list', '', 'write to result')
 cmd:option('-model', '', 'model file name')
@@ -37,9 +43,16 @@ end
 local feature_dim = opt.dim
 local feature_list = opt.feature_list
 local max_feature = opt.max_feature
---local model = torch.load(opt.model)
---model:cuda()
---model:evaluate()
+local compare_batch = opt.batch
+local Resolution = lu:Resolution()
+
+local model = torch.load(opt.model)
+model:cuda()
+model:evaluate()
+
+local loss = nn.PairwiseDistance(2)
+loss:cuda()
+loss:evaluate()
 
 torch.setdefaulttensortype('torch.FloatTensor')
 local feature_pool = torch.Tensor():type('torch.FloatTensor')
@@ -71,9 +84,12 @@ while true do
     end
     table.insert(meta_pool, {content_id=fields[1], mid_category=fields[2], category=fields[3], imagepath=fields[4]} )
 
-    if count == 100 then
-        break
+    if math.fmod(count,2000) == 0 then
+        xlua.progress(count, 2000000)
     end
+   -- if count == 200000 then
+   --     break
+   -- end
 end
 
 print ("count:", count)
@@ -85,11 +101,98 @@ function hello(req, res)
     res.render( template, { count = count } )
 end
 
+function extract_feature(imagepath)
+    print ('imagepath', imagepath)
+    local nsz = torch.LongStorage(4)
+    local batch = torch.Tensor():type( 'torch.CudaTensor' )
+    local img = lu:LoadNormalizedResolutionImageCenterCrop(imagepath)
+    if img == nil then
+        error( string.format("Load error:%s", imagepath) )
+    end
+    nsz[1] = 1
+    nsz[2] = Resolution[1]
+    nsz[3] = Resolution[2]
+    nsz[4] = Resolution[3]
+
+    batch:resize(nsz)
+
+    batch[1]:copy(img)
+    batch:cuda()
+    y = model:forward( batch )
+    return y
+end
+
+function retrieval(y)
+    return distance_from_pool(y)
+end
+
+
+function distance_from_pool(X)
+    local nsz = torch.LongStorage(2)
+    local batchX = torch.repeatTensor(X, compare_batch, 1)
+    local Y = torch.Tensor():type( 'torch.CudaTensor' )
+    nsz[1] = compare_batch
+    nsz[2] = feature_dim
+
+    collectgarbage()
+    batchX:cuda()
+
+    Y:resize(nsz)
+    Y:cuda()
+
+    local bucket = {}
+    for i=1,feature_pool:size(1) do
+        table.insert(bucket,{index=i,value=9999})
+    end
+
+    print( "pool:", feature_pool:size(1))
+    local mind = 9999
+    for i=1,feature_pool:size(1),compare_batch do
+        local bsize = math.min( feature_pool:size(1) - i, compare_batch )
+        local z = feature_pool[{{i,i+bsize-1},{}}]
+        if bsize ~= compare_batch then
+            batchX = torch.repeatTensor(X, bsize, 1)
+            nsz[1] = bsize
+            Y:resize(nsz)
+        end
+        --print ("#z", z:size())
+        --print ("#Y", Y:size())
+        Y:copy(z)
+        --d = (X - Y)*(X - Y)
+        --bucket[i].value = d
+        d = loss:forward({batchX,Y})
+        for j=1,bsize do
+            bucket[i+j-1].value = d[j]
+        end
+    end
+    print ("sorting...")
+
+    table.sort(bucket, function(a, b) 
+                return a.value < b.value 
+            end )
+    local result = {}
+    for k=1,10 do
+        print ("bucket", bucket[k])
+        index = bucket[k].index
+        if index > 0 then
+            table.insert(result, {rank=k,content_id=meta_pool[index].content_id, mid_category=meta_pool[index].mid_category,
+                category=meta_pool[index].category, imagepath=meta_pool[index].imagepath, distance=bucket[k].value} )
+        end
+    end
+    print ("end---")
+
+    return result
+end
+
 function query(req, res)
     local img_url = req.body
     print ("image_url", img_url)
     --buf, header = DownloadFileFromURL(img_url)
-    body, header, status, code = HTTPRequest(img_url)
+    ok, body, header, status, code = pcall(HTTPRequest,'GET', img_url)
+    if ok == false then
+        res.send(header)
+        return
+    end
     if code ~= 200 then
         res.send(header)
         return
@@ -109,13 +212,25 @@ function query(req, res)
     print ('header', header)
 
     print ('status:', status, 'code:', code, 'body:', #body)
-    res.send( string.format("%s",header) )
 
     file = io.open( filename, "wb+")
     file:write( body )
     file:close()
 
+    local ok, status = pcall( extract_feature, filename )
+    if ok == false then
+        print("fail to extract feature from image", status)
+        res.send("error")
+        return
+    end
+
+    local ok, retrieval = pcall( retrieval, status )
+
+    result = { query=img_url,
+            retrieved_list=retrieval }
+
     print (header)
+    res.send( string.format("%s", json:encode(result)) )
 end
 
 app.get('/',hello)

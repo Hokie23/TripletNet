@@ -74,9 +74,9 @@ for i=1,#batch_items do
         batch[current_batch]:copy(img)
 
         if current_batch == batchSize then
+            batch:cuda()
             local y = model:forward( batch )
             current_batch = 0
-            batch:cuda()
 
             for j=1,y:size(1) do
                 local feature = string.format("%f", y[j][1])

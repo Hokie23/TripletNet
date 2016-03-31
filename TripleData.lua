@@ -140,7 +140,7 @@ function SelectListTriplets(embedding_net, db, size, TensorType)
         --print ("anchor_name", anchor_name, "ap_dist:", ap_dist)
         local small_dist = 99999
         semi_hard_negative_name = nil
-        for trial=1,100 do
+        for trial=1,10 do
             local neg_batch_name = {}
             local neg_batch_jitter = {}
             for ni=1,4 do
@@ -170,7 +170,7 @@ function SelectListTriplets(embedding_net, db, size, TensorType)
             for ni=1,4 do
                 bdist = dist(anchor_vector, negative_vector[ni])
                 --print ("negative bdist", bdist)
-                if bdist > 0.002 then
+                if bdist > 0.000002 then
                     if (bdist > ap_dist and bdist < small_dist) or math.random(10) == 1 then
                         small_dist = bdist
                         semi_hard_negative_name = neg_batch_name[ni]
