@@ -28,24 +28,3 @@ th Main.lua -dataset Cifar10 -LR 0.1 -save new_exp_dir
 ```
 
 ##Additional flags
-|Flag             | Default Value        |Description
-|:----------------|:--------------------:|:----------------------------------------------
-|modelsFolder     |  ./Models/           | Models Folder
-|network          |  Model.lua           | Model file - must return valid network.
-|LR               |  0.1                 | learning rate
-|LRDecay          |  0                   | learning rate decay (in # samples
-|weightDecay      |  1e-4                | L2 penalty on the weights
-|momentum         |  0.9                 | momentum
-|batchSize        |  128                 | batch size
-|optimization     |  sgd                 | optimization method
-|epoch            |  -1                  | number of epochs to train (-1 for unbounded)
-|threads          |  8                   | number of threads
-|type             |  cuda                | float or cuda
-|devid            |  1                   | device ID (if using CUDA)
-|load             |  none                | load existing net weights
-|save             |  time-identifier     | save directory
-|dataset          |  Cifar10             | Dataset - Cifar10, Cifar100, STL10, SVHN, MNIST
-|normalize        |  1                   | 1 - normalize using only 1 mean and std values
-|whiten           |  false               | whiten data
-|augment          |  false               | Augment training data
-|preProcDir       |  ./PreProcData/      | Data for pre-processing (means,Pinv,P)

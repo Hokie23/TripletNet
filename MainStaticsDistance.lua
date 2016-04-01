@@ -20,15 +20,21 @@ cmd:text('===>Model And Training Regime')
 --cmd:option('-modelsFolder',       './Results/WedMar2314:56:452016/',            'Models Folder') -- 128 The best model
 --cmd:option('-network',            'Embedding.t715',            'embedding network file - must return valid network.')
 
-cmd:option('-modelsFolder',       './Results/MonMar2116:45:482016/',            'Models Folder') -- 512 model
+cmd:option('-modelsFolder',       './Results/TueMar2914:54:572016/',            'Models Folder') -- 128(relu) The best model
+cmd:option('-network',            'Embedding.t711',            'embedding network file - must return valid network.')
+
+--cmd:option('-modelsFolder',       './Results/MonMar2116:45:482016/',            'Models Folder') -- 512 model
 --cmd:option('-network',            'Embedding.t76',            'embedding network file - must return valid network.')
-cmd:option('-network',            'Embedding.t758',            'embedding network file - must return valid network.')
+--cmd:option('-network',            'Embedding.t758',            'embedding network file - must return valid network.')
 
 --cmd:option('-modelsFolder',       './Results/TueMar2220:13:462016/',            'Models Folder') -- 512 model
 --cmd:option('-network',            'Embedding.t78',            'embedding network file - must return valid network.')
 
 --cmd:option('-modelsFolder',       './Results/WedMar2319:55:362016/',            'Models Folder') -- 1024(relu) model
 --cmd:option('-network',            'Embedding.t78',            'embedding network file - must return valid network.')
+
+--cmd:option('-modelsFolder',       './Results/ThuMar3114:43:522016/',            'Models Folder') -- grid 135
+--cmd:option('-network',            'Embedding.t73',            'embedding network file - must return valid network.')
 
 cmd:text('===>Platform Optimization')
 cmd:option('-batchSize',          10,                    'batch size')
@@ -80,7 +86,8 @@ os.execute('mkdir -p ' .. opt.save)
 cmd:log(opt.save .. '/Log.txt', opt)
 ----------------------------------------------------------------------
 
-local fashion_test_pair = 'fashion_pair_test.csv'
+--local fashion_test_pair = 'fashion_pair_test.csv'
+local fashion_test_pair = 'fashion_pair_valid.csv'
 
 print ('load pairs', fashion_test_pair)
 local Resolution = lu:Resolution()

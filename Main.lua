@@ -1,5 +1,6 @@
 require 'DataContainer'
 require 'TripletNet2'
+require 'TripletNet'
 require 'cutorch'
 require 'eladtools'
 require 'optim'
@@ -82,9 +83,10 @@ end
 ----------------------------------------------------------------------
 -- Model + Loss:
 local EmbeddingNet = require(opt.network)
-local TripletNet = nn.TripletNet2(EmbeddingNet)
---local Loss = nn.DistanceRatioCriterion()
-local Loss = nn.TripletEmbeddingCriterion(0.2)
+--local TripletNet = nn.TripletNet2(EmbeddingNet)
+local TripletNet = nn.TripletNet(EmbeddingNet)
+local Loss = nn.DistanceRatioCriterion()
+--local Loss = nn.TripletEmbeddingCriterion(0.2)
 TripletNet:cuda()
 Loss:cuda()
 
