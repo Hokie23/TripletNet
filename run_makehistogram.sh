@@ -1,6 +1,7 @@
 #!/bin/bash
 
 CUDA_VISIBLE_DEVICES=0 th MainMakeHistogram.lua -project distance_pair_128_valid
+CUDA_VISIBLE_DEVICES=0 th MainMakeHistogram.lua -project distance_pair_128_relu_valid
 CUDA_VISIBLE_DEVICES=0 th MainMakeHistogram.lua -project distance_pair_128_0328_norm
 CUDA_VISIBLE_DEVICES=0 th MainMakeHistogram.lua -project distance_pair_1024_norm
 CUDA_VISIBLE_DEVICES=0 th MainMakeHistogram.lua -project distance_pair_128_0328

@@ -269,7 +269,8 @@ function Train(DataC, epoch)
                             return
                         end
 
-                        local y = optimizer:optimize({x[1],x[2],x[3]})
+                        --local y = optimizer:optimize({x[1],x[2],x[3]})
+                        local y = optimizer:optimize({x[1],x[2],x[3]}, 1)
                         -- local y = optimizer:optimize({x[1],x[2],x[3]}, 1)
                         local lerr = ErrorCount(y)
 
@@ -338,6 +339,7 @@ function Test(DataC, epoch)
                     if x == nil then
                         return
                     end
+                    --local y = TripletNet:forward({x[1],x[2],x[3]})
                     local y = TripletNet:forward({x[1],x[2],x[3]})
                     local lerr = ErrorCount(y)
                     --print( "Test lerr: ", lerr*100.0/y[1]:size(1) )
