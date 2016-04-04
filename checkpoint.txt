@@ -56,4 +56,6 @@
             5. Input 차원의 jittering 문제?
             6. Pretrain model을 바꾸어 볼까?
                 이것은 이미 2048에서 1024와 동일한 결과를 내었다.
+            7. Training Set에 대한 성능은?
+                이상하게 traning set에서도 성능이 떨어지는 느낌을 받는다.
             

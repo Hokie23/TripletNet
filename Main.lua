@@ -51,7 +51,8 @@ cmd:text('===>Data Options')
 cmd:option('-dataset',            'fashion',              'Dataset - Cifar10 or Cifar100')
 --cmd:option('-size',               640000,                 'size of training list' )
 --cmd:option('-size',               640,                 'size of training list' )
-cmd:option('-size',               180,                 'size of training list' )
+--cmd:option('-size',               180,                 'size of training list' )
+cmd:option('-size',               12,                 'size of training list' )
 --cmd:option('-size',               64,                 'size of training list' )
 --cmd:option('-size',               640,                 'size of training list' )
 --cmd:option('-size',               64000,                 'size of training list' )
@@ -128,13 +129,22 @@ print(TripletNet)
 print '==> Loss'
 print(Loss)
 
+TrainSampleStage = {
+    current= 1
+}
+
 ---------------------------------------------------------------------
 function ReGenerateTrain(net, selection_mode)
     if selection_mode then
         return GenerateListTriplets(data.TrainData,SizeTrain, "train")
     else
         --return SelectListTriplets(net,data.TrainData,SizeTrain, 'torch.FloatTensor')
-        return SelectListTriplets(net,data.TrainData,SizeTrain, 'torch.CudaTensor')
+        if TrainSampleStage.isend then
+            data.TrainData.IsEnd = true
+            ShuffleTrain(data.TrainData, TrainSampleStage)
+        end
+
+        return SelectListTriplets(net,data.TrainData,SizeTrain, 'torch.CudaTensor', TrainSampleStage)
     end
 end
 
@@ -211,84 +221,84 @@ function Train(DataC, epoch)
     print ("RunTrain")
     local err = 0
     local num = 0
-    local nepoch = 40
+    local nepoch =1
 
-    for epoch=1,nepoch do
-        print ("Train epoch:", epoch)
-        thread_pool:synchronize()
-        DataC:Reset()
+    print ("Train epoch:", epoch)
+    thread_pool:synchronize()
+    DataC:Reset()
+    collectgarbage()
+
+    while DataC:IsContinue() do
+        TripletNet:evaluate()
         EmbeddingNet:evaluate()
         DataC:GenerateList(EmbeddingNet, true)
-        collectgarbage()
         EmbeddingNet:training()
         TripletNet:training()
-        while DataC:IsContinue() do
-            local mylist = DataC:GetNextBatch()
-            --print ("LoadImageFunc:", DataC.LoadImageFunc)
-            local jobparam = WorkerParam(mylist, DataC.TensorType, DataC.Resolution, DataC.LoadImageFunc, DataC.NumEachSet)
-            -- print ("train #", x)
-            thread_pool:addjob(
-                    function (param)
-                        local function catnumsize(num,size)
-                            local stg = torch.LongStorage(#size+1)
-                            stg[1] = num
-                            for i=2,stg:size() do
-                                stg[i]=size[i-1]
+        local mylist = DataC:GetNextBatch()
+        --print ("LoadImageFunc:", DataC.LoadImageFunc)
+        local jobparam = WorkerParam(mylist, DataC.TensorType, DataC.Resolution, DataC.LoadImageFunc, DataC.NumEachSet)
+        -- print ("train #", x)
+        thread_pool:addjob(
+                function (param)
+                    local function catnumsize(num,size)
+                        local stg = torch.LongStorage(#size+1)
+                        stg[1] = num
+                        for i=2,stg:size() do
+                            stg[i]=size[i-1]
+                        end
+                        return stg
+                    end
+                    --print ( string.format("%x, getnextbatch()", __threadid) )
+                    local batchlist = param.BatchList
+                    local batch = torch.Tensor():type(param.TensorType)
+                    local size = #batchlist
+                    nsz = catnumsize(param.NumEachSet, catnumsize(size,  param.Resolution))
+                    batch:resize(nsz)
+
+                    for j=1,#batchlist do
+                        for i=1, param.NumEachSet do
+                            local filename = batchlist[j].names[i]
+                            local jitter = batchlist[j].jitter[i]
+                            local ok, img = pcall(param.LoadImageFunc,filename, jitter)
+                            assert(img ~= nil)
+                            if ok == false then
+                                print ('jitter, w1', jitter.w1, 'h1', jitter.h1, 'bFlip', jitter.bFlip, "aspect_ratio", jitter.aspect_ratio)
+                                print ("image load error", filename, "jitter", jitter)
+                                print ("error:", img)
+                                return nil
                             end
-                            return stg
+
+                            batch[i][j]:copy(img)
                         end
-                        --print ( string.format("%x, getnextbatch()", __threadid) )
-                        local batchlist = param.BatchList
-                        local batch = torch.Tensor():type(param.TensorType)
-                        local size = #batchlist
-                        nsz = catnumsize(param.NumEachSet, catnumsize(size,  param.Resolution))
-                        batch:resize(nsz)
+                    end
 
-                        for j=1,#batchlist do
-                            for i=1, param.NumEachSet do
-                                local filename = batchlist[j].names[i]
-                                local jitter = batchlist[j].jitter[i]
-                                local ok, img = pcall(param.LoadImageFunc,filename, jitter)
-                                assert(img ~= nil)
-                                if ok == false then
-                                    print ('jitter, w1', jitter.w1, 'h1', jitter.h1, 'bFlip', jitter.bFlip, "aspect_ratio", jitter.aspect_ratio)
-                                    print ("image load error", filename, "jitter", jitter)
-                                    print ("error:", img)
-                                    return nil
-                                end
+                    return batch
+                end,
+                function (x)
+                    if x == nil then
+                        print ('x is nil')
+                        return
+                    end
 
-                                batch[i][j]:copy(img)
-                            end
-                        end
+                    --local y = optimizer:optimize({x[1],x[2],x[3]})
+                    local y = optimizer:optimize({x[1],x[2],x[3]}, 1)
+                    -- local y = optimizer:optimize({x[1],x[2],x[3]}, 1)
+                    local lerr = ErrorCount(y)
 
-                        return batch
-                    end,
-                    function (x)
-                        if x == nil then
-                            print ('x is nil')
-                            return
-                        end
+                    --print("y:", y)
 
-                        --local y = optimizer:optimize({x[1],x[2],x[3]})
-                        local y = optimizer:optimize({x[1],x[2],x[3]}, 1)
-                        -- local y = optimizer:optimize({x[1],x[2],x[3]}, 1)
-                        local lerr = ErrorCount(y)
+                    -- print( "lerr: ", lerr*100.0/y[1]:size(1) )
+                    print( string.format("[epoch #%d]: Train lerr: %e", epoch, lerr ) )
 
-                        --print("y:", y)
-
-                        -- print( "lerr: ", lerr*100.0/y[1]:size(1) )
-                        print( string.format("[epoch #%d]: Train lerr: %e", epoch, lerr ) )
-
-                        err = err + lerr
-                        xlua.progress(num*DataC.BatchSize, DataC:size()*nepoch)
-                        num = num + 1
-                    end,
-                    jobparam 
-                )
-        end
-
-        thread_pool:synchronize()
+                    err = err + lerr
+                    xlua.progress(num*DataC.BatchSize, DataC:size()*nepoch)
+                    num = num + 1
+                end,
+                jobparam 
+            )
     end
+
+    thread_pool:synchronize()
 
     if num == 0 then
         return 0

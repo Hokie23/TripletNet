@@ -30,7 +30,18 @@ function LoadNormalizedResolutionImage(filename, jitter)
     return lu:LoadNormalizedResolutionImage(filename, jitter)
 end
 
-function SelectListTriplets(embedding_net, db, size, TensorType)
+function ShuffleTrain(db, SampleState)
+    local rand = math.random
+    local data = db.data
+    local nclasses = #data.anchor_name_list
+    for i=nclasses,2,-1 do
+        j = rand(i)
+        data.anchor_name_list[i], data.anchor_name_list[j] = data.anchor_name_list[j], data.anchor_name_list[i]
+    end
+    SampleState.current = 1
+end
+
+function SelectListTriplets(embedding_net, db, size, TensorType, SampleStage)
     print ("select list triplets", size)
 
     local data = db.data
@@ -38,34 +49,23 @@ function SelectListTriplets(embedding_net, db, size, TensorType)
     local list = {}
     local nClasses = #data.anchor_name_list 
 
-    local candidate_anchor_list = {}
-    for i=1, size do
-        local anchor_name = data.anchor_name_list[i]
-        if anchor_name ~= nil then
-            pos_of_anchor = data.positive[anchor_name]
-            if pos_of_anchor ~= nil then
-                print ("insert", anchor_name)
-                table.insert(candidate_anchor_list, anchor_name)
-            end
-        end
-    end
-
-    print ("canidate list", #candidate_anchor_list)
-
+    local isend = false
+    local current = SampleStage.current or 1
     for i=1, size do
         local anchor_img
         local anchor_vector, positive_vector, negative_vector
         local anchor_jitter, positive_jitter, negative_jitter
 
         local ap_dist, an_dist
-        print ("generate list #" .. i .. "/#" .. #candidate_anchor_list)
+        print ("generate list #" .. i .. "/#" .. #data.anchor_name_list .. string.format("[%d-#s%d]",current, SampleStage.current) )
         local c1, anchor_name, hard_positive_name, semi_hard_negative_name
-        c1 = math.random(#candidate_anchor_list)
+        --c1 = math.random(#candidate_anchor_list)
+        c1 = current
 
         local nsz = torch.LongStorage(4)
         while true do
             hard_positive_name = nil
-            anchor_name = candidate_anchor_list[c1]
+            anchor_name = data.anchor_name_list[c1]
             local batch = torch.Tensor():type( TensorType )
             --print ( 'anchor_name:', anchor_name )
 
@@ -197,8 +197,16 @@ function SelectListTriplets(embedding_net, db, size, TensorType)
             table.insert(list, exemplar)
             print ("exemplar", exemplar)
         end
+
+        current = current + 1
+        if current > #data.anchor_name_list then
+            isend = true
+            current = 1
+        end
     end
 
+    SampleStage.isend = isend
+    SampleStage.current = current
     print ("Selection Generate:", #list)
     return list
 end

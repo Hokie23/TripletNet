@@ -34,6 +34,7 @@ function DataContainer:__init(...)
 
 
     --self.CurrentItemMutex = thread.Mutex()
+    self.IsEnd = false
     self.BatchSize = args.BatchSize
     self.TensorType = args.TensorType
     self.ExtractFunction = args.ExtractFunction
@@ -58,6 +59,7 @@ function DataContainer:size()
 end
 
 function DataContainer:Reset()
+    self.IsEnd = false
     self.CurrentItem = 1
 end
 
@@ -101,24 +103,12 @@ function DataContainer:LoadBatch(batchlist)
     return batch
 end
 
-function DataContainer:IsContinue()
-    if self.List == nil then
-        return false
-    end
-
-    if #self.List == 0 then
-        return false
-    end
-
-    if self.CurrentItem <= #self.List then
-        return true
-    end
-
-    return false
-end
-
 function DataContainer:Lock()
     --self.CurrentItemMutex.lock()
+end
+
+function DataContainer:IsContinue()
+    return self.IsEnd == false
 end
 
 function DataContainer:Unlock()
