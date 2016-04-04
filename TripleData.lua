@@ -3,6 +3,8 @@ require 'image'
 require 'math'
 require 'loadutils'
 
+local debugger = require('fb.debugger')
+
 local opt = opt or {}
 local PreProcDir = opt.preProcDir or './'
 local Whiten = opt.whiten or false
@@ -31,6 +33,7 @@ function LoadNormalizedResolutionImage(filename, jitter)
 end
 
 function ShuffleTrain(db, SampleState)
+    print ('shuffing...')
     local rand = math.random
     local data = db.data
     local nclasses = #data.anchor_name_list
@@ -51,13 +54,13 @@ function SelectListTriplets(embedding_net, db, size, TensorType, SampleStage)
 
     local isend = false
     local current = SampleStage.current or 1
-    for i=1, size do
+    while #list < size do
         local anchor_img
         local anchor_vector, positive_vector, negative_vector
         local anchor_jitter, positive_jitter, negative_jitter
 
         local ap_dist, an_dist
-        print ("generate list #" .. i .. "/#" .. #data.anchor_name_list .. string.format("[%d-#s%d]",current, SampleStage.current) )
+        print ("generate list #" .. current .. "/#" .. #data.anchor_name_list .. string.format("[%d-#s%d]",current, SampleStage.current) )
         local c1, anchor_name, hard_positive_name, semi_hard_negative_name
         --c1 = math.random(#candidate_anchor_list)
         c1 = current
@@ -198,6 +201,7 @@ function SelectListTriplets(embedding_net, db, size, TensorType, SampleStage)
             print ("exemplar", exemplar)
         end
 
+        --current = current + 1000
         current = current + 1
         if current > #data.anchor_name_list then
             isend = true
@@ -216,6 +220,7 @@ function GenerateListTriplets(db, size, prefix)
     local data = db.data
     local list = {}
     local nClasses = #data.anchor_name_list 
+    --for i=1, size,100 do
     for i=1, size do
         --print ("generate list #" .. i .. "/#" .. size)
         local c1, anchor_name, positive_name, negative_name

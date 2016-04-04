@@ -82,6 +82,7 @@ end
 --end
 
 function DataContainer:GenerateList(net)
+    self.CurrentItem = 1
     self.List = self.ListGenFunc(net)
 end
 
@@ -114,7 +115,6 @@ end
 function DataContainer:Unlock()
     --self.CurrentItemMutex.unlock()
 end
-
 
 function DataContainer:GetNextBatch(net)
     self:Lock()

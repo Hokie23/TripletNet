@@ -11,6 +11,8 @@ require 'TripletEmbeddingCriterion'
 require 'cunn'
 require 'WorkerParam'
 
+local debugger = require( 'fb.debugger' )
+
 ----------------------------------------------------------------------
 
 cmd = torch.CmdLine()
@@ -130,6 +132,8 @@ print '==> Loss'
 print(Loss)
 
 TrainSampleStage = {
+    isend = false,
+    total_size = #data.TrainData.data.anchor_name_list,
     current= 1
 }
 
@@ -141,7 +145,6 @@ function ReGenerateTrain(net, selection_mode)
         --return SelectListTriplets(net,data.TrainData,SizeTrain, 'torch.FloatTensor')
         if TrainSampleStage.isend then
             data.TrainData.IsEnd = true
-            ShuffleTrain(data.TrainData, TrainSampleStage)
         end
 
         return SelectListTriplets(net,data.TrainData,SizeTrain, 'torch.CudaTensor', TrainSampleStage)
@@ -225,77 +228,84 @@ function Train(DataC, epoch)
 
     print ("Train epoch:", epoch)
     thread_pool:synchronize()
+    ShuffleTrain(data.TrainData, TrainSampleStage)
     DataC:Reset()
-    collectgarbage()
-
-    while DataC:IsContinue() do
+    TrainSampleStage.isend = false
+    while TrainSampleStage.isend == false do
+        collectgarbage()
         TripletNet:evaluate()
         EmbeddingNet:evaluate()
         DataC:GenerateList(EmbeddingNet, true)
         EmbeddingNet:training()
         TripletNet:training()
-        local mylist = DataC:GetNextBatch()
-        --print ("LoadImageFunc:", DataC.LoadImageFunc)
-        local jobparam = WorkerParam(mylist, DataC.TensorType, DataC.Resolution, DataC.LoadImageFunc, DataC.NumEachSet)
-        -- print ("train #", x)
-        thread_pool:addjob(
-                function (param)
-                    local function catnumsize(num,size)
-                        local stg = torch.LongStorage(#size+1)
-                        stg[1] = num
-                        for i=2,stg:size() do
-                            stg[i]=size[i-1]
-                        end
-                        return stg
-                    end
-                    --print ( string.format("%x, getnextbatch()", __threadid) )
-                    local batchlist = param.BatchList
-                    local batch = torch.Tensor():type(param.TensorType)
-                    local size = #batchlist
-                    nsz = catnumsize(param.NumEachSet, catnumsize(size,  param.Resolution))
-                    batch:resize(nsz)
 
-                    for j=1,#batchlist do
-                        for i=1, param.NumEachSet do
-                            local filename = batchlist[j].names[i]
-                            local jitter = batchlist[j].jitter[i]
-                            local ok, img = pcall(param.LoadImageFunc,filename, jitter)
-                            assert(img ~= nil)
-                            if ok == false then
-                                print ('jitter, w1', jitter.w1, 'h1', jitter.h1, 'bFlip', jitter.bFlip, "aspect_ratio", jitter.aspect_ratio)
-                                print ("image load error", filename, "jitter", jitter)
-                                print ("error:", img)
-                                return nil
+        while true do
+            local mylist = DataC:GetNextBatch()
+            if mylist == nil then
+                break
+            end
+            --print ("LoadImageFunc:", DataC.LoadImageFunc)
+            local jobparam = WorkerParam(mylist, DataC.TensorType, DataC.Resolution, DataC.LoadImageFunc, DataC.NumEachSet)
+            -- print ("train #", x)
+            thread_pool:addjob(
+                    function (param)
+                        local function catnumsize(num,size)
+                            local stg = torch.LongStorage(#size+1)
+                            stg[1] = num
+                            for i=2,stg:size() do
+                                stg[i]=size[i-1]
                             end
-
-                            batch[i][j]:copy(img)
+                            return stg
                         end
-                    end
+                        --print ( string.format("%x, getnextbatch()", __threadid) )
+                        local batchlist = param.BatchList
+                        local batch = torch.Tensor():type(param.TensorType)
+                        local size = #batchlist
+                        nsz = catnumsize(param.NumEachSet, catnumsize(size,  param.Resolution))
+                        batch:resize(nsz)
 
-                    return batch
-                end,
-                function (x)
-                    if x == nil then
-                        print ('x is nil')
-                        return
-                    end
+                        for j=1,#batchlist do
+                            for i=1, param.NumEachSet do
+                                local filename = batchlist[j].names[i]
+                                local jitter = batchlist[j].jitter[i]
+                                local ok, img = pcall(param.LoadImageFunc,filename, jitter)
+                                assert(img ~= nil)
+                                if ok == false then
+                                    print ('jitter, w1', jitter.w1, 'h1', jitter.h1, 'bFlip', jitter.bFlip, "aspect_ratio", jitter.aspect_ratio)
+                                    print ("image load error", filename, "jitter", jitter)
+                                    print ("error:", img)
+                                    return nil
+                                end
 
-                    --local y = optimizer:optimize({x[1],x[2],x[3]})
-                    local y = optimizer:optimize({x[1],x[2],x[3]}, 1)
-                    -- local y = optimizer:optimize({x[1],x[2],x[3]}, 1)
-                    local lerr = ErrorCount(y)
+                                batch[i][j]:copy(img)
+                            end
+                        end
 
-                    --print("y:", y)
+                        return batch
+                    end,
+                    function (x)
+                        if x == nil then
+                            print ('x is nil')
+                            return
+                        end
 
-                    -- print( "lerr: ", lerr*100.0/y[1]:size(1) )
-                    print( string.format("[epoch #%d]: Train lerr: %e", epoch, lerr ) )
+                        --local y = optimizer:optimize({x[1],x[2],x[3]})
+                        local y = optimizer:optimize({x[1],x[2],x[3]}, 1)
+                        -- local y = optimizer:optimize({x[1],x[2],x[3]}, 1)
+                        local lerr = ErrorCount(y)
 
-                    err = err + lerr
-                    xlua.progress(num*DataC.BatchSize, DataC:size()*nepoch)
-                    num = num + 1
-                end,
-                jobparam 
-            )
+                        --print("y:", y)
+
+                        -- print( "lerr: ", lerr*100.0/y[1]:size(1) )
+                        print( string.format("[epoch #%d]: Train lerr: %e", epoch, lerr ) )
+
+                        err = err + lerr
+                        xlua.progress(num*DataC.BatchSize, TrainSampleStage.total_size )
+                        num = num + 1
+                    end,
+                    jobparam 
+                )
+        end
     end
 
     thread_pool:synchronize()
@@ -313,8 +323,11 @@ function Test(DataC, epoch)
     TripletNet:evaluate()
     local err = 0
     local num = 0
-    while DataC:IsContinue() do
+    while true do
         local mylist = DataC:GetNextBatch()
+        if mylist == nil then
+            break
+        end
         local jobparam = WorkerParam(mylist, DataC.TensorType, DataC.Resolution, DataC.LoadImageFunc, DataC.NumEachSet)
         thread_pool:addjob(
                 function (param)
