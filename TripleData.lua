@@ -215,6 +215,72 @@ function SelectListTriplets(embedding_net, db, size, TensorType, SampleStage)
     return list
 end
 
+function SelectListTripletsSimple(db, size, TensorType, SampleStage)
+    print ("generate list triplets", size)
+    local data = db.data
+    local list = {}
+
+    local isend = false
+    local current = SampleStage.current or 1
+    --for i=1, size,100 do
+    while #list < size do
+        print ("generate list #" .. string.format("%d:%d",#list,current) .. "/#" .. size)
+        local c1, anchor_name, positive_name, negative_name
+
+        c1 = current
+        local isbreak = (function() 
+            anchor_name = data.anchor_name_list[c1]
+
+            pos_of_anchor = data.positive[anchor_name]
+            if pos_of_anchor == nil then
+                return nil
+            end
+            positive_name = pos_of_anchor[math.random(#pos_of_anchor)]
+
+            local neg_of_anchor = data.negative[anchor_name]
+            if neg_of_anchor == nil or math.random(3) == 0 then
+                local n1 = c1
+                local n3 = math.random( #data.all_negative_list )
+                negative_name = data.all_negative_list[n3]
+                --print ("0", #data.all_negative_list, "n:", negative_name)
+                while negative_name  == anchor_name do
+                    n3 = math.random( #data.all_negative_list )
+                    negative_name = data.all_negative_list[n3]
+                end
+            else
+                local n3 = math.random(#neg_of_anchor)
+                negative_name = neg_of_anchor[n3]
+            end
+
+            local exemplar_names = {anchor_name, negative_name, positive_name}
+            local exemplar = {names=exemplar_names, jitter={}}
+
+            --print( exemplar )
+            assert(anchor_name ~= nil)
+            assert(negative_name ~= nil)
+            assert(positive_name ~= nil)
+
+            table.insert(list, exemplar)
+            return nil
+        end)()
+
+        if isbreak == "break" then
+            break
+        end
+
+        current = current + 1
+        if current > #data.anchor_name_list then
+            isend = true
+            current = 1
+        end
+    end
+    SampleStage.isend = isend
+    SampleStage.current = current
+    print ("Selection Generate:", #list)
+    return list
+end
+
+
 function GenerateListTriplets(db, size, prefix)
     print ("generate list triplets", size)
     local data = db.data

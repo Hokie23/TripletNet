@@ -5,10 +5,7 @@ local SiameseDistanceNet, parent = torch.class('nn.SiameseDistanceNet', 'nn.gMod
 
 local function CreateSiameseDistanceNet(EmbeddingNet, distMetric, inputs)
     local embeddings = {}
-    local outputs = {}
     local nets = {EmbeddingNet}
-    print("Create SiameseDistanceNet of EmbeddingNet #1:", EmbeddingNet)
-    print("Create SiameseDistanceNet of EmbeddingNet #2:", nets)
     local num = #inputs
     for i=1,num do
         if i < num then
@@ -16,8 +13,6 @@ local function CreateSiameseDistanceNet(EmbeddingNet, distMetric, inputs)
         end
         local n = nets[i](inputs[i]) 
         embeddings[i] = n
-        print ("embeddings[i]", embeddings[i])
-        outputs[i] = n
     end
 
     dists = nn.View(-1,1)( distMetric:clone()( {embeddings[1], embeddings[2]} ) )
@@ -64,16 +59,12 @@ function SiameseDistanceNet:__init(EmbeddingNet, distMetric, collectFeat)
 end
 
 function SiameseDistanceNet:shareWeights()
-    --for j=1,#self.nets[i] do
-    --    self.nets[1]:share( self.EmbeddingNet,'weight','bias','gradWeight','gradBias','running_mean','running_std')
-    --end
     for i=1,self.num-1 do
           for j=1,#self.nets[i] do
             self.nets[i+1][j]:share(self.nets[1][j],'weight','bias','gradWeight','gradBias','running_mean','running_std')
           end
     end
 end
-
 
 function SiameseDistanceNet:type(t)
     parent.type(self, t)

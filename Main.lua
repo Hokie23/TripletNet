@@ -147,7 +147,8 @@ function ReGenerateTrain(net, selection_mode)
             data.TrainData.IsEnd = true
         end
 
-        return SelectListTriplets(net,data.TrainData,SizeTrain, 'torch.CudaTensor', TrainSampleStage)
+        --return SelectListTriplets(net,data.TrainData,SizeTrain, 'torch.CudaTensor', TrainSampleStage)
+        return SelectListTripletsSimple(data.TrainData,SizeTrain, 'torch.CudaTensor', TrainSampleStage)
     end
 end
 
@@ -235,7 +236,7 @@ function Train(DataC, epoch)
         collectgarbage()
         TripletNet:evaluate()
         EmbeddingNet:evaluate()
-        DataC:GenerateList(EmbeddingNet, true)
+        DataC:GenerateList(EmbeddingNet)
         EmbeddingNet:training()
         TripletNet:training()
 
@@ -306,6 +307,7 @@ function Train(DataC, epoch)
                     jobparam 
                 )
         end
+        thread_pool:synchronize()
     end
 
     thread_pool:synchronize()
@@ -373,6 +375,7 @@ function Test(DataC, epoch)
                 end,
                 jobparam
             )
+        thread_pool:synchronize()
     end
     thread_pool:synchronize()
     if num == 0 then
