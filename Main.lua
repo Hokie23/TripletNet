@@ -27,7 +27,8 @@ cmd:option('-modelsFolder',       './Models/',            'Models Folder')
 -- cmd:option('-network',            'Model.lua',            'embedding network file - must return valid network.')
 -- cmd:option('-network',            'resception_512.lua',            'embedding network file - must return valid network.')
 --cmd:option('-network',            'resception_128_relu.lua',            'embedding network file - must return valid network.')
-cmd:option('-network',            'resception_135_grid.lua',            'embedding network file - must return valid network.')
+--cmd:option('-network',            'resception_135_grid.lua',            'embedding network file - must return valid network.')
+cmd:option('-network',            'layerdrop_135_grid.lua',            'embedding network file - must return valid network.')
 cmd:option('-LR',                 0.001,                    'learning rate')
 cmd:option('-LRDecay',            1e-6,                   'learning rate decay (in # samples)')
 cmd:option('-weightDecay',        1e-4,                   'L2 penalty on the weights')
@@ -179,8 +180,15 @@ local TestDataContainer = DataContainer{
 
 
 local function ErrorCount(y)
-    loss = Loss:forward(y)
-    return loss
+    if torch.type(y) == 'table' then
+        y = y[#y]
+    end
+    --return (y[{{},2}]:ge(y[{{},1}]):sum())
+    return (y[{{},2}]:ge(y[{{},1}]):mean())
+--loss = Loss:forward(y)
+    --local neg_loss = -(y[1]-1.0)
+    --local loss = y[2]:mean() + neg_loss:mean()
+    --return loss*0.5
 end
 
 local optimState = {
@@ -241,6 +249,7 @@ function Train(DataC, epoch)
         TripletNet:training()
 
         while true do
+            collectgarbage()
             local mylist = DataC:GetNextBatch()
             if mylist == nil then
                 break
