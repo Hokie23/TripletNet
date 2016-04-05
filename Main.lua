@@ -10,6 +10,12 @@ require 'DistanceRatioCriterion'
 require 'TripletEmbeddingCriterion'
 require 'cunn'
 require 'WorkerParam'
+require 'cudnn'
+
+
+cudnn.benchmark = true
+cudnn.fastest = true
+cudnn.verbose = true
 
 local debugger = require( 'fb.debugger' )
 
@@ -216,6 +222,9 @@ local thread_pool = threads.Threads( nthread, function(idx)
                     require 'torch'
                     require 'threads'
                     require 'cudnn'
+                    cudnn.benchmark = true
+                    cudnn.fastest = true
+                    cudnn.verbose = true
                     require 'WorkerParam'
                     require 'preprocess'
                     require 'image'

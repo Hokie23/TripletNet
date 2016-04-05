@@ -32,7 +32,7 @@ function LayerDrop:__init(deathRate, nChannels, nOutChannels, stride, name)
     self.skip = nn.Sequential()
     self.skip:add(nn.Identity())
     self.skip:add( cudnn.SpatialConvolution(nChannels, nOutChannels, 1, 1, stride, stride, 0, 0)
-                            :init('weight', nninit.sparse, 0.2)
+                            :init('weight', nninit.sparse, 0.8)
                             :init('bias', nninit.constant, 0))
     self.modules = {self.net, self.skip}
 end
