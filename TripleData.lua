@@ -224,7 +224,7 @@ function SelectListTripletsSimple(db, size, TensorType, SampleStage)
     local current = SampleStage.current or 1
     --for i=1, size,100 do
     while #list < size do
-        print ("generate list #" .. string.format("%d:%d",#list,current) .. "/#" .. size)
+        --print ("generate list #" .. string.format("%d:%d",#list,current) .. "/#" .. size)
         local c1, anchor_name, positive_name, negative_name
 
         c1 = current

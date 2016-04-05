@@ -190,6 +190,8 @@ local function ErrorCount(y)
         y = y[#y]
     end
     --return (y[{{},2}]:ge(y[{{},1}]):sum())
+    -- y[{{},1}] = negative distance
+    -- y[{{},2}] = positive distance
     return (y[{{},2}]:ge(y[{{},1}]):mean())
 --loss = Loss:forward(y)
     --local neg_loss = -(y[1]-1.0)
@@ -309,7 +311,7 @@ function Train(DataC, epoch)
                         end
 
                         --local y = optimizer:optimize({x[1],x[2],x[3]})
-                        local y = optimizer:optimize({x[1],x[2],x[3]}, 1)
+                        local y = optimizer:optimize({x[1],x[2],x[3]}, math.sqrt(2))
                         -- local y = optimizer:optimize({x[1],x[2],x[3]}, 1)
                         local lerr = ErrorCount(y)
 
