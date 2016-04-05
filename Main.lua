@@ -344,6 +344,7 @@ function Test(DataC, epoch)
     local err = 0
     local num = 0
     while true do
+        collectgarbage()
         local mylist = DataC:GetNextBatch()
         if mylist == nil then
             break

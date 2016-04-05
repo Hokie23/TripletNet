@@ -115,7 +115,9 @@ function CalculateDistance()
         nsz[4] = Resolution[2]
         nsz[5] = Resolution[3]
 
-        batch:resize(nsz)
+        if batch:size(2) ~= bsize then
+            batch:resize(nsz)
+        end
 
         for i=1,bsize do
             --print( "counter", counter, "i", i )
