@@ -69,6 +69,7 @@ function LayerDrop:accGradParameters(input, gradOutput, scale)
     if self.gate then
         self.net:accGradParameters(input, gradOutput, scale)
     end
+    self.skip:accGradParameters(input, gradOutput, scale)
 end
 
 ---- Adds a residual block to the passed in model ----
