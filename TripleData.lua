@@ -215,7 +215,7 @@ function SelectListTriplets(embedding_net, db, size, TensorType, SampleStage)
 
     SampleStage.isend = isend
     SampleStage.current = current
-    print ("Selection Generate:", #list)
+    --print ("Selection Generate:", #list)
     return list
 end
 
@@ -273,6 +273,7 @@ function SelectListTripletsSimple(db, size, TensorType, SampleStage)
         end
 
         current = current + 1
+        --current = current + 1000
         if current > #data.anchor_name_list then
             isend = true
             current = 1
@@ -280,7 +281,7 @@ function SelectListTripletsSimple(db, size, TensorType, SampleStage)
     end
     SampleStage.isend = isend
     SampleStage.current = current
-    print ("Selection Generate:", #list)
+    --print ("Selection Generate:", #list)
     return list
 end
 

@@ -113,15 +113,15 @@ Loss:cuda()
 
 
 local Weights, Gradients = TripletNet:getParameters()
-local EmbeddingWeights, EmbeddingGradients = EmbeddingNet:getParameters()
+--local EmbeddingWeights, EmbeddingGradients = EmbeddingNet:getParameters()
 
-debugger.enter()
-if Weights[1] ~= EmbeddingWeights[1] then
-    error('miss matched')
-end
-if Weights[2] ~= EmbeddingWeights[2] then
-    error('miss matched')
-end
+--debugger.enter()
+--if Weights[1] ~= EmbeddingWeights[1] then
+--    error('miss matched')
+--end
+--if Weights[2] ~= EmbeddingWeights[2] then
+--    error('miss matched')
+--end
 
 if paths.filep(opt.load) then
     local w = torch.load(opt.load)
@@ -258,7 +258,8 @@ local thread_pool = threads.Threads( nthread, function(idx)
                 function(idx)
                     print ("set data: " .. idx)
                 end)
-                
+
+print ("-------261") 
 function Train(DataC, epoch)
     print ("RunTrain")
     local err = 0
@@ -279,8 +280,8 @@ function Train(DataC, epoch)
         TripletNet:training()
 
         while true do
-            --local Weights, Gradients = TripletNet:getParameters()
-            --local EmbeddingWeights, EmbeddingGradients = EmbeddingNet:getParameters()
+           -- local Weights, Gradients = TripletNet:getParameters()
+           -- local EmbeddingWeights, EmbeddingGradients = EmbeddingNet:getParameters()
 
             --if Weights[1] ~= EmbeddingWeights[1] then
             --    debugger.enter()
@@ -364,6 +365,7 @@ function Train(DataC, epoch)
     return (err/num)
 end
 
+print ("-----367")
 function Test(DataC, epoch)
     print ("RunTest")
     thread_pool:synchronize()
@@ -432,29 +434,35 @@ function Test(DataC, epoch)
 end
 
 
+print ("-----436")
 local bestErr = 10000
 local epoch = 1
 print '\n==> Starting Training\n'
 while epoch ~= opt.epoch do
     print('Epoch ' .. epoch)
     local ErrTrain = Train(TrainDataContainer, epoch)
+    collectgarbage()
 
     local ew, egradp = EmbeddingNet:getParameters()
     local lightmodel = EmbeddingNet:clone('weight', 'bias', 'running_mean', 'running_std')
     local tw, tgradp = TripletNet:getParameters()
-    local light_triplet_model = TripletNet:clone('weight', 'bias', 'running_mean', 'running_std')
+
+    EmbeddingNet:clearState()
+    TripletNet:clearState()
+
     torch.save(network_filename .. epoch, lightmodel)
     torch.save(weights_filename .. 'embedding.t7' .. epoch, ew)
-    torch.save(weights_filename .. epoch, tw)
-    torch.save(weights_filename .. 'tripletnet.t7' .. epoch, light_triplet_model)
+    --torch.save(weights_filename .. epoch, tw)
+    --torch.save(weights_filename .. 'tripletnet.t7' .. epoch, TripletNet)
     print( string.format('[epoch #%d] Training Error = %f', epoch,  ErrTrain) )
     local ErrTest = Test(TestDataContainer, epoch)
     if bestErr > ErrTest then
+        print ("Save Best")
         bestErr = ErrTest
-        torch.save(network_filename .. 'best', lightmodel)
-        torch.save(weights_filename .. 'best.embedding.t7' .. epoch, ew)
-        torch.save(weights_filename .. 'best', tw)
-        torch.save(weights_filename .. 'best.tripletnet.t7' .. epoch, light_triplet_model)
+        torch.save(network_filename .. 'best.embedding.model.t7', lightmodel)
+        torch.save(weights_filename .. 'best.embedding.w.t7', ew)
+        torch.save(network_filename .. 'best.tripletnet.t7', TripletNet)
+        torch.save(weights_filename .. 'best.tripletnet.w.t7', tw)
     end
 
     print( string.format('[epoch #%d] Test Error = %f', epoch, ErrTest) )
