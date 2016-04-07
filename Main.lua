@@ -181,7 +181,7 @@ local TestDataContainer = DataContainer{
     BatchSize = opt.batchSize,
     BulkImage = false,
     NumEachSet = 3,
-    LoadImageFunc = LoadNormalizedResolutionImage,
+    LoadImageFunc = LoadNormalizedResolutionImageCenterCrop,
     Resolution = {3, 299, 299}
 }
 
@@ -261,6 +261,9 @@ function Train(DataC, epoch)
         TripletNet:training()
 
         while true do
+            if EmbeddingWeights[1] ~= Weights[1] then
+                error("miss matched weight")
+            end
             collectgarbage()
             local mylist = DataC:GetNextBatch()
             if mylist == nil then
@@ -414,6 +417,7 @@ while epoch ~= opt.epoch do
     print('Epoch ' .. epoch)
     local ErrTrain = Train(TrainDataContainer, epoch)
     torch.save(network_filename .. epoch, EmbeddingNet)
+    torch.save(weights_filename .. 'embedding.t7' .. epoch, EmbeddingWeights)
     torch.save(weights_filename .. epoch, Weights)
     print( string.format('[epoch #%d] Training Error = %f', epoch,  ErrTrain) )
     local ErrTest = Test(TestDataContainer, epoch)

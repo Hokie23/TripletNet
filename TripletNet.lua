@@ -53,10 +53,11 @@ function TripletNet:__init(EmbeddingNet, num, distMetric, collectFeat)
     local currInputs = inputs
     for f=1,#collectFeat do
         local end_layer = collectFeat[f].layerNum
-        local net = nn.Sequential()
-        for l=start_layer,end_layer do
-            net:add(self.EmbeddingNet:get(l))
-        end
+        local net = EmbeddingNet:clone('weight','bias','gradWeight','gradBias','running_mean','running_std')
+        --local net = nn.Sequential()
+        --for l=start_layer,end_layer do
+        --    net:add(self.EmbeddingNet:get(l))
+        --end
 
         local nets, dists, embeddings = CreateTripletNet(net, currInputs, self.distMetric, collectFeat[f].postProcess)
         currInputs = {}

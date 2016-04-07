@@ -28,6 +28,10 @@ function dist(a, b)
     return d
 end
 
+function LoadNormalizedResolutionImageCenterCrop(filename, jitter)
+    return lu:LoadNormalizedResolutionImageCenterCrop(filename)
+end
+
 function LoadNormalizedResolutionImage(filename, jitter)
     return lu:LoadNormalizedResolutionImage(filename, jitter)
 end

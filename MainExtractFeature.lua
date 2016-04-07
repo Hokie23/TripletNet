@@ -6,6 +6,11 @@ require 'loadutils'
 require 'xlua'
 require 'cudnn'
 
+
+cudnn.benchmark = true
+cudnn.fastest = true
+cudnn.verbose = true
+
 cmd = torch.CmdLine()
 
 cmd:addTime()

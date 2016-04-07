@@ -37,10 +37,7 @@ function SiameseDistanceNet:__init(EmbeddingNet, distMetric, collectFeat)
     local currInputs = inputs
     for f=1,#collectFeat do
         local end_layer = collectFeat[f].layerNum
-        local net = nn.Sequential()
-        for l=start_layer,end_layer do
-            net:add(self.EmbeddingNet:get(l))
-        end
+        local net = EmbeddingNet:clone('weight','bias','gradWeight','gradBias','running_mean','running_std')
 
         local nets, net_outputs, embeddings = CreateSiameseDistanceNet(net, self.distMetric, currInputs)
         currInputs = {}

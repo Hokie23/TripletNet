@@ -5,10 +5,11 @@ require 'cunn'
 require 'xlua'
 require 'trepl'
 require 'loadutils'
+require 'cudnn'
 require 'SiameseDistanceNet'
+require 'AttentionLSTM'
 
 ----------------------------------------------------------------------
-
 cmd = torch.CmdLine()
 cmd:addTime()
 cmd:text()
@@ -17,8 +18,10 @@ cmd:text()
 cmd:text('==>Options')
 
 cmd:text('===>Model And Training Regime')
-cmd:option('-modelsFolder',       './Results/WedMar2314:56:452016/',            'Models Folder') -- 128 The best model
-cmd:option('-network',            'Embedding.t715',            'embedding network file - must return valid network.')
+--cmd:option('-modelsFolder',       './Results/WedMar2314:56:452016/',            'Models Folder') -- 128 The best model
+--cmd:option('-network',            'Embedding.t715',            'embedding network file - must return valid network.')
+cmd:option('-modelsFolder',       './Results/WedApr614:32:082016/',            'Models Folder') -- 128 attention The best model
+cmd:option('-network',            'Embedding.t713',            'embedding network file - must return valid network.')
 
 --cmd:option('-modelsFolder',       './Results/TueMar2914:54:572016/',            'Models Folder') -- 128(relu) The best model
 --cmd:option('-network',            'Embedding.t711',            'embedding network file - must return valid network.')
@@ -37,7 +40,7 @@ cmd:option('-network',            'Embedding.t715',            'embedding networ
 --cmd:option('-network',            'Embedding.t73',            'embedding network file - must return valid network.')
 
 cmd:text('===>Platform Optimization')
-cmd:option('-batchSize',          10,                    'batch size')
+cmd:option('-batchSize',          14,                    'batch size')
 cmd:option('-threads',            16,                      'number of threads')
 cmd:option('-type',               'cuda',                 'float or cuda')
 cmd:option('-devid',              1,                      'device ID (if using CUDA)')
@@ -68,6 +71,11 @@ local EmbeddingNet = torch.load(opt.network)
 print ("EmbeddingNet:", EmbeddingNet)
 print ('complete')
 
+cudnn.benchmark = true
+cudnn.fastest = true
+cudnn.verbose = true
+
+
 EmbeddingNet:cuda()
 local EmbeddingWeights, EmbeddingGradients = EmbeddingNet:getParameters()
 if opt.load ~= '' then
@@ -87,8 +95,8 @@ cmd:log(opt.save .. '/Log.txt', opt)
 ----------------------------------------------------------------------
 
 --local fashion_test_pair = 'fashion_pair_test.csv'
---local fashion_test_pair = 'fashion_pair_valid.csv'
-local fashion_test_pair = 'fashion_pair_train.csv'
+local fashion_test_pair = 'fashion_pair_valid.csv'
+--local fashion_test_pair = 'fashion_pair_train.csv'
 
 print ('load pairs', fashion_test_pair)
 local Resolution = lu:Resolution()
@@ -115,7 +123,7 @@ function CalculateDistance()
         nsz[4] = Resolution[2]
         nsz[5] = Resolution[3]
 
-        if batch:size(2) ~= bsize then
+        if batch:dim() ~= 5 or batch:size(2) ~= bsize then
             batch:resize(nsz)
         end
 
