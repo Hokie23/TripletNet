@@ -1,10 +1,12 @@
 #!/bin/bash
 
+CUDA_VISIBLE_DEVICES=0 th MainMakeHistogram.lua -project distance_pair
 CUDA_VISIBLE_DEVICES=0 th MainMakeHistogram.lua -project distance_pair_128_att
 CUDA_VISIBLE_DEVICES=0 th MainMakeHistogram.lua -project distance_pair_128_att_valid
 CUDA_VISIBLE_DEVICES=0 th MainMakeHistogram.lua -project distance_pair_128_att_valid_a
 CUDA_VISIBLE_DEVICES=0 th MainMakeHistogram.lua -project distance_pair_128_att_valid_b
 CUDA_VISIBLE_DEVICES=0 th MainMakeHistogram.lua -project distance_pair_128_att_valid_c
+CUDA_VISIBLE_DEVICES=0 th MainMakeHistogram.lua -project distance_pair_128_att_valid_d
 CUDA_VISIBLE_DEVICES=0 th MainMakeHistogram.lua -project distance_pair_128_valid
 CUDA_VISIBLE_DEVICES=0 th MainMakeHistogram.lua -project distance_pair_128_train
 CUDA_VISIBLE_DEVICES=0 th MainMakeHistogram.lua -project distance_pair_128_relu_valid

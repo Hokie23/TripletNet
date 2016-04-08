@@ -20,8 +20,10 @@ cmd:text('==>Options')
 cmd:text('===>Model And Training Regime')
 --cmd:option('-modelsFolder',       './Results/WedMar2314:56:452016/',            'Models Folder') -- 128 The best model
 --cmd:option('-network',            'Embedding.t715',            'embedding network file - must return valid network.')
-cmd:option('-modelsFolder',       './Results/WedApr614:32:082016/',            'Models Folder') -- 128 attention The best model
-cmd:option('-network',            'Embedding.t713',            'embedding network file - must return valid network.')
+--cmd:option('-modelsFolder',       './Results/ThuApr716:46:042016/',            'Models Folder') -- 128 attention The best model
+--cmd:option('-network',            'Embedding.t71',            'embedding network file - must return valid network.')
+cmd:option('-modelsFolder',       './Results/ThuApr718:01:002016/',            'Models Folder') -- 128 attention The best model
+cmd:option('-network',            'Embedding.t711',            'embedding network file - must return valid network.')
 
 --cmd:option('-modelsFolder',       './Results/TueMar2914:54:572016/',            'Models Folder') -- 128(relu) The best model
 --cmd:option('-network',            'Embedding.t711',            'embedding network file - must return valid network.')

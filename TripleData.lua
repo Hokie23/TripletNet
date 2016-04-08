@@ -220,9 +220,9 @@ function SelectListTriplets(embedding_net, db, size, TensorType, SampleStage)
 end
 
 function SelectListTripletsSimple(db, size, TensorType, SampleStage)
-    print ("generate list triplets", size)
     local data = db.data
     local list = {}
+    print ("generate list triplets", size, string.format("%d/%d", SampleStage.current, #data.anchor_name_list) )
 
     local isend = false
     local current = SampleStage.current or 1

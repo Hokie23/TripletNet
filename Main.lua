@@ -11,9 +11,9 @@ require 'TripletEmbeddingCriterion'
 require 'cunn'
 require 'WorkerParam'
 require 'cudnn'
-local async = require('async')
+--local async = require('async')
 
-async.repl()
+--async.repl()
 
 cudnn.benchmark = true
 cudnn.fastest = true
@@ -86,7 +86,7 @@ torch.setnumthreads(opt.threads)
 cutorch.setDevice(opt.devid)
 
 print ("REPL port", opt.port)
-async.repl.listen( {host='0.0.0.0', port=opt.port} )
+--async.repl.listen( {host='0.0.0.0', port=opt.port} )
 
 
 opt.network = opt.modelsFolder .. paths.basename(opt.network, '.lua')
@@ -103,17 +103,20 @@ end
 ----------------------------------------------------------------------
 -- Model + Loss:
 local EmbeddingNet = require(opt.network)
+EmbeddingNet:cuda()
+local EmbeddingWeights, EmbeddingGradients = EmbeddingNet:getParameters()
 --local TripletNet = nn.TripletNet2(EmbeddingNet)
 local TripletNet = nn.TripletNet(EmbeddingNet)
 local Loss = nn.DistanceRatioCriterion()
 --local Loss = nn.TripletEmbeddingCriterion(0.2)
-EmbeddingNet:cuda()
 TripletNet:cuda()
 Loss:cuda()
 
 
 local Weights, Gradients = TripletNet:getParameters()
---local EmbeddingWeights, EmbeddingGradients = EmbeddingNet:getParameters()
+
+first_weight = {Weights[1], EmbeddingWeights[1]}
+
 
 --debugger.enter()
 --if Weights[1] ~= EmbeddingWeights[1] then
@@ -268,6 +271,7 @@ function Train(DataC, epoch)
 
     print ("Train epoch:", epoch)
     thread_pool:synchronize()
+
     ShuffleTrain(data.TrainData, TrainSampleStage)
     DataC:Reset()
     TrainSampleStage.isend = false
@@ -280,12 +284,27 @@ function Train(DataC, epoch)
         TripletNet:training()
 
         while true do
-           -- local Weights, Gradients = TripletNet:getParameters()
-           -- local EmbeddingWeights, EmbeddingGradients = EmbeddingNet:getParameters()
-
             --if Weights[1] ~= EmbeddingWeights[1] then
-            --    debugger.enter()
-            --    error('miss matched')
+--                print (first_weight)
+--                print ('original', Weights[1], EmbeddingWeights[1])
+--                --local W2, G2 = TripletNet:getParameters()
+--                local W2, G2 = TripletNet.nets[1]:getParameters()
+--
+--                print ('type(Weight):', Weights:type(), 'type(W2):', W2:type())
+--                print ('after getparameters', Weights[1], W2[1], EmbeddingWeights[1])
+--
+                --W2 = W2:float()
+                --print ('after float', Weights[1], W2[1], EmbeddingWeights[1])
+                --local w = Weights:float()
+                --print ('type(Weight):', w:type(), 'type(W2):', W2:type())
+                --print ('after Weights float', w[1], W2[1], EmbeddingWeights[1])
+                --print ('optimization', optimizer.Parameters[1][1])
+                --TripletNet:cuda()
+                --Weights:cuda()
+--
+--                debugger.enter()
+--
+                --error('miss matched')
             --end
             collectgarbage()
             local mylist = DataC:GetNextBatch()
@@ -353,8 +372,15 @@ function Train(DataC, epoch)
                     end,
                     jobparam 
                 )
+            thread_pool:synchronize()
+            --W1 = optimizer.Parameters[1]
+            --G1 = optimizer.Parameters[2]
+            --ew1 = W1
+            --W1:copy(optimizer.Parameters[1])
+            --G1:copy(optimizer.Parameters[2])
+            collectgarbage()
+
         end
-        thread_pool:synchronize()
     end
 
     thread_pool:synchronize()
@@ -443,15 +469,18 @@ while epoch ~= opt.epoch do
     local ErrTrain = Train(TrainDataContainer, epoch)
     collectgarbage()
 
+    EmbeddingNet:clearState()
+    TripletNet:clearState()
+
     local ew, egradp = EmbeddingNet:getParameters()
     local lightmodel = EmbeddingNet:clone('weight', 'bias', 'running_mean', 'running_std')
     local tw, tgradp = TripletNet:getParameters()
 
-    EmbeddingNet:clearState()
-    TripletNet:clearState()
+    --optimizer.Parameters = {tw, tgradp},
 
     torch.save(network_filename .. epoch, lightmodel)
     torch.save(weights_filename .. 'embedding.t7' .. epoch, ew)
+    torch.save(weights_filename .. 'optim.w.t7' .. epoch, optimizer.Parameters[1])
     --torch.save(weights_filename .. epoch, tw)
     --torch.save(weights_filename .. 'tripletnet.t7' .. epoch, TripletNet)
     print( string.format('[epoch #%d] Training Error = %f', epoch,  ErrTrain) )
@@ -463,6 +492,7 @@ while epoch ~= opt.epoch do
         torch.save(weights_filename .. 'best.embedding.w.t7', ew)
         torch.save(network_filename .. 'best.tripletnet.t7', TripletNet)
         torch.save(weights_filename .. 'best.tripletnet.w.t7', tw)
+        torch.save(weights_filename .. 'best.optim.w.t7', optimizer.Parameters[1])
     end
 
     print( string.format('[epoch #%d] Test Error = %f', epoch, ErrTest) )
