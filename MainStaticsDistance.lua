@@ -168,7 +168,7 @@ function CalculateDistance()
         counter = counter + batchSize
     end
 
-    csvigo.save({path=output, data=outputs})
+    csvigo.save({path=output_filename, data=outputs})
 end
 
 CalculateDistance()

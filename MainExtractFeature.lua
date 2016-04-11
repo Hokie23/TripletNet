@@ -5,6 +5,8 @@ require 'cunn'
 require 'loadutils'
 require 'xlua'
 require 'cudnn'
+require 'nngraph'
+require 'AttentionLSTM'
 
 
 cudnn.benchmark = true
