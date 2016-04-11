@@ -50,6 +50,7 @@ cmd:option('-devid',              1,                      'device ID (if using C
 cmd:text('===>Save/Load Options')
 cmd:option('-load',               '',                     'load existing net weights')
 cmd:option('-save',               os.date():gsub(' ',''), 'save directory')
+cmd:option('-output', 'distance_pair.csv', 'save directory')
 
 cmd:text('===>Data Options')
 cmd:option('-imagePath','/data1/october_11st/october_11st_imgs/', 'image path directory')
@@ -61,6 +62,7 @@ cutorch.setDevice(opt.devid)
 
 opt.network = opt.modelsFolder .. opt.network 
 opt.save = paths.concat('./StaticsResults', opt.save)
+output_filename = opt.output
 
 lu = loadutils(opt.imagePath)
 
@@ -96,8 +98,8 @@ os.execute('mkdir -p ' .. opt.save)
 cmd:log(opt.save .. '/Log.txt', opt)
 ----------------------------------------------------------------------
 
---local fashion_test_pair = 'fashion_pair_test.csv'
-local fashion_test_pair = 'fashion_pair_valid.csv'
+local fashion_test_pair = 'fashion_pair_test.csv'
+--local fashion_test_pair = 'fashion_pair_valid.csv'
 --local fashion_test_pair = 'fashion_pair_train.csv'
 
 print ('load pairs', fashion_test_pair)
@@ -166,7 +168,7 @@ function CalculateDistance()
         counter = counter + batchSize
     end
 
-    csvigo.save({path='distance_pair.csv', data=outputs})
+    csvigo.save({path=output, data=outputs})
 end
 
 CalculateDistance()

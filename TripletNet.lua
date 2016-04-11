@@ -13,7 +13,7 @@ local function CreateTripletNet(EmbeddingNet, inputs, distMetric)
       if i < num then
           nets[i+1] = nets[1]:clone(unpack( shared_parameters))
       end
-      embeddings[i] = nets[i](inputs[i])
+      embeddings[i] = nets[i](inputs[i]) -- convert module to graph node
   end
   local embedMain = embeddings[1]
 
@@ -55,6 +55,7 @@ function TripletNet:__init(EmbeddingNet, num, distMetric, collectFeat)
     print("TripleNet inputs:", inputs)
     print("TripleNet outputs:", outputs)
 
+    --parent.__init(self, inputs, {outputs, embeddings[1]})
     parent.__init(self, inputs, {outputs})
 end
 

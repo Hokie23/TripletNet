@@ -103,19 +103,23 @@ end
 ----------------------------------------------------------------------
 -- Model + Loss:
 local EmbeddingNet = require(opt.network)
+--local EmbeddingWeights, EmbeddingGradients = EmbeddingNet:getParameters()
 EmbeddingNet:cuda()
-local EmbeddingWeights, EmbeddingGradients = EmbeddingNet:getParameters()
 --local TripletNet = nn.TripletNet2(EmbeddingNet)
 local TripletNet = nn.TripletNet(EmbeddingNet)
+--local nLoss = nn.Sequential()
+--nLoss:add( nn.SelectTable(1) )
+--nLoss:add( nn.DistanceRatioCriterion() )
+--local Loss = nLoss
 local Loss = nn.DistanceRatioCriterion()
 --local Loss = nn.TripletEmbeddingCriterion(0.2)
+
+local Weights, Gradients = TripletNet:getParameters()
 TripletNet:cuda()
 Loss:cuda()
 
 
-local Weights, Gradients = TripletNet:getParameters()
-
-first_weight = {Weights[1], EmbeddingWeights[1]}
+first_weight = {Weights[1]}
 
 
 --debugger.enter()
@@ -286,12 +290,12 @@ function Train(DataC, epoch)
         while true do
             --if Weights[1] ~= EmbeddingWeights[1] then
 --                print (first_weight)
---                print ('original', Weights[1], EmbeddingWeights[1])
+--                print ('original', Weights[1])
 --                --local W2, G2 = TripletNet:getParameters()
---                local W2, G2 = TripletNet.nets[1]:getParameters()
---
+--                local W2, G2 = TripletNet.nets[3]:getParameters()
 --                print ('type(Weight):', Weights:type(), 'type(W2):', W2:type())
---                print ('after getparameters', Weights[1], W2[1], EmbeddingWeights[1])
+--                print ('after getparameters', Weights[1], W2[1])
+----
 --
                 --W2 = W2:float()
                 --print ('after float', Weights[1], W2[1], EmbeddingWeights[1])
@@ -358,6 +362,10 @@ function Train(DataC, epoch)
 
                         --local y = optimizer:optimize({x[1],x[2],x[3]})
                         local y = optimizer:optimize({x[1],x[2],x[3]}, math.sqrt(2))
+                        --local y2 = EmbeddingNet:forward( x[1] )
+                        --local d = (y2 - y[2]):abs():max()
+                        --print ("d", d)
+                        --debugger.enter()
                         -- local y = optimizer:optimize({x[1],x[2],x[3]}, 1)
                         local lerr = ErrorCount(y)
 
