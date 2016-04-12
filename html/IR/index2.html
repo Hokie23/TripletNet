@@ -1,0 +1,716 @@
+<html>
+<head>
+    <meta charset="UTF-8" http-equiv="X-UA-COMPATIBLE" content="IE=8">
+    <!-- jquery jcrop -->
+    <script src="/jquery/jquery.min.js"></script>
+    <script src="/Jcrop/js/Jcrop.js"></script>
+    <script src="/imagesloaded/imagesloaded.pkgd.min.js"></script>
+    <link href="/Jcrop/css/Jcrop.css" rel="stylesheet" type="text/css"/>
+
+    <!-- bootstrap -->
+    <link rel="stylesheet" href="/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/bootstrap/css/bootstrap-theme.min.css">
+    <script src="/bootstrap/js/bootstrap.min.js"></script>
+    <script type="text/javascript">
+        function getURLParameter(name) {
+            return decodeURIComponent((new RegExp('[?|&]' + name + '=' + '([^&;]+?)(&|#|;|$)').exec(location.search) || [, ""])[1].replace(/\+/g, '%20')) || null
+        }
+
+        var jcrop_api;
+        var productNo = getURLParameter('productNo');
+
+        jQuery(function ($) {
+            var d = document, ge = 'getElementById';
+
+            $('#interface').on('cropmove cropend', function (e, s, c) {
+                d[ge]('left').value = c.x;
+                d[ge]('top').value = c.y;
+                d[ge]('width').value = c.w;
+                d[ge]('height').value = c.h;
+            });
+
+            $('#target').Jcrop({}, function () {
+                jcrop_api = this;
+            });
+
+            $('#addLabel').click(function () {
+                apiSaveLabel();
+            });
+
+            $('#nextImage').click(function () {
+                loadImage();
+            });
+
+            $('#noLabel').click(function () {
+                noLabel();
+            });
+
+            $('#exportData').click(function () {
+                apiExportData();
+            });
+
+            $('#createName').bind("change paste keyup", function () {
+                if (!$('#createName').val()) {
+                    $('#keyword').attr("disabled", true);
+                } else {
+                    $('#keyword').attr("disabled", false);
+                }
+            });
+
+            $('#keyword').on("change", function () {
+                disableButton($('#nextImage'));
+                disableButton($('#addLabel'));
+                disableButton($('#noLabel'));
+                
+                if (!$("#keyword").val()) {
+                    alert("키워드를 선택해 주세요.");
+                    $("#keyword").focus();
+                    return;
+                }
+                loadImage();
+            });
+
+            $(document).on('click', 'button.label-delete', function () {
+                if (confirm("선택된 레이블을 삭제 하시겠습니까?")) {
+                    deleteLabel($(this).attr("labelNo"), true);
+                }
+            });
+
+        });
+
+        $(document).ready(function () {
+            $('#interface').hide();
+            $('#loading').hide();
+            apiGetKeywords();
+            disableButton($('#nextImage'));
+            disableButton($('#addLabel'));
+            disableButton($('#noLabel'));
+            
+            if (productNo) {
+                loadImage();
+            }
+        });
+
+        function noLabel() {
+            if ($("#labelList").children().size() > 0) {
+                alert("설정된 라벨이 있습니다.\n\n다음 이미지를 작업 하시려면 '다음이미지'를 클릭해 주세요.")
+            }
+            if ($("#labeledYn").val() == 'N') {
+                apiUpdateProductLabeled($("#productNo").val());
+            }
+            loadImage();
+        }
+
+        function addLabel(labelNo, prdNo, keywordNo, x, y, w, h, dt) {
+            var str = "";
+            str += "<li class='cust-label' ";
+            str += "labelNo='" + labelNo + "' ";
+            str += "prdNo='" + labelNo + "' ";
+            str += "keywordNo='" + keywordNo + "' ";
+            str += "x='" + x + "' ";
+            str += "y='" + y + "' ";
+            str += "w='" + w + "' ";
+            str += "h='" + h + "' ";
+            str += "dt='" + dt + "' ";
+            str += " >";
+            str += "<div style='";
+            str += "    float: left; ";
+            str += "    position:relative; ";
+            str += "    overflow: hidden; ";
+            str += "    border: 1px black solid; ";
+            str += "    width: " + w + "px; ";
+            str += "    height: " + h + "px; ";
+            str += "'>";
+            str += "<img src='" + $("#target").attr("src") + "' class='labelImg' ";
+            str += "style='";
+            str += "    position:absolute; ";
+            str += "    left: -" + x + "px; ";
+            str += "    top: -" + y + "px; ";
+            str += "'>";
+            str += "</div>";
+            str += "<div style='float: left; padding-left:10px;'>";
+            str += "No : " + labelNo + "<br>";
+            str += "Keyword : " + $('#keyword option[value="' + keywordNo + '"]').attr("caption") + "<br>";
+            str += "Left : " + x + "<br>";
+            str += "Top : " + y + "<br>";
+            str += "Width : " + w + "<br>";
+            str += "Height : " + h + "<br>";
+            str += "Date : " + dt + "<br>";
+            str += "<div class='btn-group'>";
+            str += "<button labelNo='" + labelNo + "' name='testAction' id='testAction' type='button' class='btn btn-default label-delete'>삭제</button>";
+            str += "</div>";
+            str += "</div>";
+            str += "<div style='float: none; clear: both;'></div>";
+            str += "</li>";
+
+
+            $('#labelList').prepend(str);
+        }
+
+        function deleteLabel(no, deleteDb) {
+            if ($('.cust-label[labelNo=' + no + ']')) {
+                $('li.cust-label[labelNo=' + no + ']').remove();
+                if (deleteDb) apiDeleteLabel(no);
+            }
+        }
+
+        function clearLabels() {
+            var labels = $('#labelList').children();
+            labels.each(function () {
+                deleteLabel($(this, false).attr("labelNo"));
+            });
+        }
+
+        function disableButton(b) {
+            b.attr("disabled", true);
+        }
+
+        function enableButton(b) {
+            b.attr("disabled", false);
+        }
+
+        function apiExportData() { 
+          window.location.href="/api/exports";
+        }
+
+        function apiGetCategory() {
+            if (!$('#categoryNo').val()) {
+                return;
+            }
+            $.ajax({
+                type: "GET",
+                url: "/api/categories/" + $('#categoryNo').val(),
+                cache: false,
+                dataType: "json"
+
+            }).done(function (data, textStatus, xhr) {
+                $('#category1').text(data.result.category1Name);
+                $('#category2').text(data.result.category2Name);
+                $('#category3').text(data.result.category3Name);
+                $('#category4').text(data.result.category4Name);
+            }).fail(function (xhr, textStatus, error) {
+                alert(textStatus + "\n\n" + error);
+            });
+        }
+
+        function loadImage() {
+            disableButton($('#nextImage'));
+            disableButton($('#addLabel'));
+            $('#explain').hide();
+
+            var urlReq;
+            if (productNo) {
+                urlReq = "/api/products/" + productNo;
+            } else {
+                urlReq = "/api/products/random/" + $("#keyword").val();
+            }
+            $.ajax({
+                type: "GET",
+                url: urlReq,
+                cache: false,
+                dataType: "json"
+            }).done(function (data, textStatus, xhr) {
+                $('#interface').show();
+		$('#loading').show();
+                if (xhr.status == 204) {
+                    alert("현재 키워드에 작업 대상 이미지가 없습니다.\n\n새로운 키워드를 선택해서 작업해 주세요.");
+                    $('#interface').hide();
+		    $('#loading').hide();
+                }
+                if (jcrop_api) {
+                    jcrop_api.destroy();
+                }
+
+                var imgUrl = 'http://i.011st.com/ex_t/R/500x500/1/85/1/1/JPG/src' + data.result.imageUrl;
+                $('#productNo').val(data.result.productNo);
+                $('#labeledYn').val(data.result.labeledYn);
+                $('#categoryNo').val(data.result.categoryNo);
+                $('#category1No').val(data.result.category1No);
+                $('#category2No').val(data.result.category2No);
+                $('#category3No').val(data.result.category3No);
+                $('#category4No').val(data.result.category4No);
+                $('#target').attr("src", "");
+                $('#target').attr("src", imgUrl);
+                $('#imageUrl').html("URL : " + imgUrl);
+                $('#target').Jcrop({}, function () {
+                    jcrop_api = this;
+                });
+
+
+                $('#target').imagesLoaded()
+                    .always(function (instance) {
+                        console.log('all images loaded');
+                    })
+                    .done(function (instance) {
+                        console.log('all images successfully loaded');
+                        enableButton($('#addLabel'));
+                        enableButton($('#nextImage'));
+                        enableButton($('#noLabel'));
+			$('#loading').hide();
+                    })
+                    .fail(function () {
+                        console.log('all images loaded, at least one is brokend');
+                        alert('이미지 로딩에 실패 하였습니다. 다음 이미지로 이동합니다.');
+                        enableButton($('#addLabel'));
+                        enableButton($('#nextImage'));
+                        enableButton($('#noLabel'));
+			$('#loading').hide();
+                        loadImage();
+                    })
+                    .progress(function (instance, image) {
+                        var imgLoadRes = image.isLoaded ? 'loaded' : 'broken';
+                        console.log('image is ' + imgLoadRes + ' for ' + image.img.src);
+			$('#loading').hide();
+                    });
+
+                $('#left').val(0);
+                $('#top').val(0);
+                $('#width').val(0);
+                $('#height').val(0);
+                apiGetCategory();
+                clearLabels();
+                apiGetLabels();
+                updateKeywordReaminItem();
+            }).fail(function (xhr, textStatus, error) {
+                alert(textStatus + "\n\n" + error);
+            }).always(function () {
+            });
+        }
+
+        function apiUpdateProductUnlabeled(no) {
+            $.ajax({
+                type: "PUT",
+                url: "/api/products/" + no + "/unlabeled",
+                cache: false,
+                dataType: "json"
+
+            }).done(function (data, textStatus, xhr) {
+//                alert(xhr.responseText);
+                if (xhr.status == 200) {
+                    return true;
+                }
+            }).fail(function (xhr, textStatus, error) {
+                alert(textStatus + "\n\n" + error);
+            });
+            return false;
+        }
+
+
+        function apiUpdateProductLabeled(no) {
+            $.ajax({
+                type: "PUT",
+                url: "/api/products/" + no + "/labeled",
+                cache: false,
+                dataType: "json"
+
+            }).done(function (data, textStatus, xhr) {
+//                alert(xhr.responseText);
+                if (xhr.status == 200) {
+                    return true;
+                }
+            }).fail(function (xhr, textStatus, error) {
+                alert(textStatus + "\n\n" + error);
+            });
+            return false;
+        }
+
+        /*
+         * Keyword
+         */
+        function keywordClear() {
+            while ($("#keyword option").size() > 1) {
+                $("#keyword option:last").remove();
+            }
+        }
+
+        function apiGetKeywords() {
+            $.ajax({
+                type: "GET",
+                url: "/api/keywords",
+                cache: false,
+                dataType: "json"
+
+            }).done(function (data, textStatus, xhr) {
+                keywordClear();
+                $.each(data.result, function (i, keyword) {
+                    putKeyword(keyword.keywordNo, keyword.keyword);
+                });
+            }).fail(function (xhr, textStatus, error) {
+                alert(textStatus + "\n\n" + error);
+            });
+        }
+
+        function putKeyword(keywordNo, keyword) {
+            $('#keyword')
+                .append($("<option></option>")
+                    .attr("value", keywordNo)
+                    .attr("caption", keyword)
+                    .text(keyword));
+        }
+
+
+        function updateKeywordReaminItem() {
+            if ($('#keyword').val()) {
+                apiUpdateKeywordRemainItem($('#keyword').val(), $('#keyword option[value="' + $('#keyword').val() + '"]'));
+            }
+        }
+
+        function apiUpdateKeywordRemainItem(no, sel) {
+            $.ajax({
+                type: "GET",
+                url: "/api/products/remain/" + no,
+                cache: false,
+                dataType: "json"
+            }).done(function (data, textStatus, xhr) {
+//                alert(xhr.responseText);
+                if (xhr.status != 200) {
+                    return;
+                }
+                sel.text(sel.attr("caption") + " (" + data.result.cnt + ")");
+            }).fail(function (xhr, textStatus, error) {
+                alert(textStatus + "\n\n" + error);
+            });
+
+        }
+        /*
+         * Label
+         */
+        // addLabel(labelNo, prdNo, keywordNo, x, y, w, h, dt)
+        function apiGetLabel(no) {
+            $.ajax({
+                type: "GET",
+                url: "/api/labels/" + no,
+                cache: false,
+                dataType: "json"
+            }).done(function (data, textStatus, xhr) {
+//                alert(xhr.responseText);
+                if (xhr.status != 200) {
+                    return;
+                }
+                addLabel(data.result.labelNo,
+                    data.result.productNo,
+                    data.result.keywordNo,
+                    data.result.left,
+                    data.result.top,
+                    data.result.width,
+                    data.result.height,
+                    data.result.createDate);
+            }).fail(function (xhr, textStatus, error) {
+                alert(textStatus + "\n\n" + error);
+            });
+        }
+
+        function apiGetLabels() {
+            $.ajax({
+                type: "GET",
+                url: "/api/labels/product/" + $("#productNo").val(),
+                cache: false,
+                dataType: "json"
+
+            }).done(function (data, textStatus, xhr) {
+//                alert(xhr.responseText);
+                if (xhr.status != 200) {
+                    return;
+                }
+                $.each(data.result, function (i, label) {
+                    addLabel(label.labelNo,
+                        label.productNo,
+                        label.keywordNo,
+                        label.left,
+                        label.top,
+                        label.width,
+                        label.height,
+                        label.createDate);
+                });
+            }).fail(function (xhr, textStatus, error) {
+                alert(textStatus + "\n\n" + error);
+            });
+        }
+
+        function apiSaveLabel() {
+
+            var msg = "이미지 영역이 정상적으로 선택되지 않았습니다.";
+
+            if (!jcrop_api || !jcrop_api.ui.selection) {
+                alert(msg);
+                return;
+            }
+
+            var imageSelect = jcrop_api.getSelection();
+            if (!imageSelect) {
+                alert(msg);
+                return;
+            }
+
+            if (imageSelect.w <= 0 || imageSelect.h <= 0) {
+                alert(msg);
+                return;
+            }
+
+            if (imageSelect.w <= 50 || imageSelect.h <= 50) {
+                alert("선택된 이미지 영역이 너무 작습니다. 50x50 이상으로 선택해 주세요.");
+                return;
+            }
+
+            if (!$("#keyword").val()) {
+                alert("레이블을 선택해 주세요.");
+                $("#keyword").focus();
+                return;
+            }
+            var jsonData = JSON.stringify({
+                "productNo": $("#productNo").val(),
+                "createName": $("#createName").val(),
+                "keywordNo": $("#keyword").val(),
+                "left": imageSelect.x,
+                "top": imageSelect.y,
+                "width": imageSelect.w,
+                "height": imageSelect.h
+            });
+
+            disableButton($('#nextImage'));
+            disableButton($('#addLabel'));
+
+            $.ajax({
+                type: "POST",
+                url: "/api/labels",
+                cache: false,
+                dataType: "json",
+                contentType: "application/json",
+                data: jsonData
+            }).done(function (data, textStatus, xhr) {
+                apiGetLabel(data.result.labelNo);
+                jcrop_api.setSelect([0, 0, 0, 0]);
+                if ($("#labeledYn").val() != 'Y') {
+                    apiUpdateProductLabeled($("#productNo").val());
+                    $("#labeledYn").val('Y');
+                }
+            }).fail(function (xhr, textStatus, error) {
+                alert(textStatus + "\n\n" + error);
+            }).always(function () {
+                enableButton($('#nextImage'));
+                enableButton($('#addLabel'));
+            });
+        }
+
+        function apiDeleteLabel(no) {
+            $.ajax({
+                type: "DELETE",
+                url: "/api/labels/" + no,
+                cache: false,
+                dataType: "json"
+
+            }).done(function (data, textStatus, xhr) {
+                if ($("#labelList").children().size() == 0) {
+                    apiUpdateProductUnlabeled($("#productNo").val());
+                    $("#labeledYn").val('N');
+                }
+                return true;
+            }).fail(function (xhr, textStatus, error) {
+                alert(textStatus + "\n\n" + error);
+            });
+            return false;
+        }
+
+        /*
+         * Category
+         */
+
+    </script>
+    <style>
+        .cust-container {
+            position: relative;
+            margin: 20px;
+        }
+
+        .cust-image {
+            position: absolute;
+            top: 25px;
+            margin-left: 10px;
+            margin-top: 10px;
+        }
+
+        .cust-explain {
+            position: absolute;
+            top: 25px;
+            width: 500px;
+            margin-left: 10px;
+            margin-top: 10px;
+        }
+
+        .cust-image-table {
+            border-collapse: collapse;
+            border: 1px gray solid;
+        }
+
+        .cust-image-url {
+            position: absolute;
+            left: 0px;
+            top: 0px;
+            height: 25px;
+            margin-left: 10px;
+            margin-top: 10px;
+        }
+
+        .cust-info {
+            position: absolute;
+            top: 25px;
+            left: 500px;
+            width: 250px;
+            margin-left: 30px;
+            margin-top: 10px;
+        }
+
+        .cust-keyword {
+            position: absolute;
+            left: 720px;
+            width: 200px;
+            margin-left: 30px;
+            margin-top: 10px;
+        }
+
+        .cust-alert {
+            position: absolute;
+            top: 100px;
+            left: 10px;
+            width: 510px;
+            z-index: 1;
+        }
+
+        .cust-label {
+            border-top: 1px solid;
+            margin-top: 10px;
+        }
+
+        footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            height: 70px;
+            background-color: white;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+<div class="cust-image" id="interface">
+    <table class="cust-image-table" border="1">
+        <tr>
+            <td><img src="" id="target"></td>
+        </tr>
+    </table>
+    <ul id="labelList" style="list-style-type: none;"></ul>
+    <!--<img src="http://i.011st.com/ex_t/R/500x500/1/85/1/1/JPG/src/ag/1/7/5/2/9/5/25175295_L300_V5.jpg" id="target">-->
+</div>
+<div class="cust-image" id="loading">
+<img src="/images/loading.gif" id="target" width="300" height="300">
+</div>
+<div class="cust-explain" id="explain">
+    <div class="panel panel-default">
+        <!-- Default panel contents -->
+        <div class="panel-heading">사용법</div>
+        <div class="panel-body">
+            <ol>
+                <li>작성자를 입력 합니다.</li>
+                <li>키워드를 선택 합니다.</li>
+                <li>대상 이미지가 로드 되면 원한 영역을 드래그 합니다.</li>
+                <li>'라벨추가' 버튼을 클릭하여 키워드에 맞는 라벨을 생성 합니다.</li>
+                <li>작업이 완료 되면 '다음이미지' 버튼을 클릭 합니다.</li>
+            </ol>
+        </div>
+        <!-- List group -->
+        <ul class="list-group">
+            <li class="list-group-item">작성자를 입력하고, 키워드를 선택 해야 이미지가 나타 납니다.</li>
+            <li class="list-group-item">라벨이 하나 이상 생성되면 작업이 완료 된 것으로 간주하여 작업 대상 목록에서 제외 됩니다.</li>
+            <li class="list-group-item">라벨없이 '다음이미지'를 이용하여 이동 할 경우 이미지가 다시 나타날 수 있습니다. 이미지에 라벨을 붙일 만한 정상적인 이미지가 없을때는
+                '라벨없음'을 이용하여 작업 대상에서 제외 할 수 있습니다.
+            </li>
+        </ul>
+    </div>
+</div>
+<div class="cust-image-url" id="imageUrl">
+</div>
+<form id="selected">
+    <div class="cust-info">
+        <input name="productNo" id="productNo" type="hidden"/>
+        <input name="labeledYn" id="labeledYn" type="hidden"/>
+        <input name="categoryNo" id="categoryNo" type="hidden"/>
+        <input name="category1No" id="category1No" type="hidden"/>
+        <input name="category2No" id="category2No" type="hidden"/>
+        <input name="category3No" id="category3No" type="hidden"/>
+        <input name="category4No" id="category4No" type="hidden"/>
+
+        <div class="form-group">
+            <div class="input-group">
+                <input name="createName" id="createName" type="text" class="form-control">
+                <span class="input-group-addon">작성자</span>
+            </div>
+            <select name="keyword" id="keyword" class="form-control" size="1" disabled="true">
+                <option value="">키워드 선택</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <div class="input-group">
+                <input name="left" id="left" type="text" class="form-control" placeholder="0">
+                <span class="input-group-addon">X</span>
+            </div>
+            <div class="input-group">
+                <input name="top" id="top" type="text" class="form-control" placeholder="0">
+                <span class="input-group-addon">Y</span>
+            </div>
+            <div class="input-group">
+                <input name="width" id="width" type="text" class="form-control" placeholder="0">
+                <span class="input-group-addon">Width</span>
+            </div>
+            <div class="input-group">
+                <input name="height" id="height" type="text" class="form-control" placeholder="0">
+                <span class="input-group-addon">Height</span>
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="btn-group">
+                <button name="addLabel" id="addLabel" type="button" class="btn btn-default">라벨추가</button>
+                <button name="nextImage" id="nextImage" type="button" class="btn btn-default">다음이미지</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="btn-group">
+                <button name="noLabel" id="noLabel" type="button" class="btn btn-default">라벨없음</button>
+            </div>
+        </div>
+        <div class="form-group">
+        </div>
+        <div class="form-group">
+            <p></p>
+            <table class="table" width="100%">
+                <thead>
+                <tr>
+                    <th colspan="2">카테고리</th>
+                </tr>
+                <tr>
+                    <td>대 :</td>
+                    <td id="category1"></td>
+                </tr>
+                <tr>
+                    <td>중 :</td>
+                    <td id="category2"></td>
+                </tr>
+                <tr>
+                    <td>소 :</td>
+                    <td id="category3"></td>
+                </tr>
+                <tr>
+                    <td>세 :</td>
+                    <td id="category4"></td>
+                </tr>
+                </thead>
+            </table>
+        </div>
+        <div class="form-group">
+            <div class="btn-group">
+                <button name="exportData" id="exportData" type="button" class="btn btn-default">데이터 내려받기</button>
+            </div>
+        </div>        
+    </div>
+</form>
+</body>
+</html>

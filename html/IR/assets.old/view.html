@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="ko">
+    <head>
+        <title>SK Planet, Image Retrieval</title>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Comptatible" content="IE=10">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="shortcut icon" href="/IR/img/favicon.png" />
+        <link rel="stylesheet" href="/IR/css/bootstrap.min.css">
+        <link rel="stylesheet" href="/IR/css/jquery.tagsinput.css">
+        <link href="css/simple-sidebar.css" rel="stylesheet">
+        <link href="css/smartpaginator.css" rel="stylesheet">
+        <link rel="stylesheet" type="text/css" href="css/jquery.dialogbox.css">
+        <script src="/IR/js/jquery.min.js"></script>
+        <script src="/IR/js/bootstrap.min.js"></script>
+        <script src="/IR/js/masonry.pkgd.min.js"></script>
+        <script src="/IR/js/jquery.tagsinput.js"></script>
+        <script src="/IR/js/smartpaginator.js"></script>
+        <script src="/IR/js/jquery.bootpag.min.js"></script>
+        <script src="/IR/js/myscript.js"></script>
+        <script src="/IR/js/myserver.js"></script>
+        <script src="/IR/js/jquery.dialogBox.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/2.0.0/handlebars.min.js" type="application/javascript"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.imagesloaded/3.2.0/imagesloaded.pkgd.min.js"></script>
+        <script type="text/javascript">
+            // global area
+            var _remote_server = "175.126.56.112:16001";
+            var max_page = 0;
+            var item_per_page = 9;
+            var retrieval_template;
+            var page_template;
+            var myserver = new MyServer();
+        </script>
+        <script id="page_entry" type="text/x-handlebars-template">
+            <div class="col-sm-6 col-md-6 grid-item-img-onpage">
+                <img src="{{image_url}}" onclick="javascript: page_onclick(this);">
+                <span id="category" style="display:none;">{{category}}</span>
+                <span id="image_url" style="display:none;">{{image_url}}</span>
+            </div>
+        </script>
+        <script id="entry_retrieval" type="text/x-handlebars-template">
+            <section class="{{classname}}" id="{{section_id}}">
+                <hr>
+                <div class="container">
+                    <span id="param_query_url" style="display:none">{{query_url}}</span>
+                    <span id="param_category" style="display:none">{{category}}</span>
+                    <div class="fixed">
+                        <button class="btn btn-primary" id="btn_submit" type="button" data-toggle="submit"">제출</button>
+                    </div>
+                    <div class="row" id="query_deepfeature">
+                        <div class="col-sm-11 col-md-11">
+                            <img src="{{query_url}}" width=120>
+                        </div>
+                        <div class="col-sm-1 col-md-1">
+                            <button class="btn btn-primary close" type="button" id="btn_close" data-toggle="close">&times;</button>
+                        </div>
+                        <div class="col-sm-11 col-md-11">
+                            <input id="query_tag" type="text" placeholder="Put your tag of this here..." class="form-control input-wide" autocomplete="on" value="">
+                            service_id: <span id="service_id">{{service_id}}</span>
+                        </div>
+                    </div>
+                    <div class="row grid" id="retrived_deepfeature" style="">
+                        {{#each container_id_list}}
+                        <div class="col-sm-2 col-md-2 grid-item" width=200 height=300 style="text-align:center;">
+                            <span id="retrieved_image_url" style="display:none">{{image_url}}</span>
+                            <img src="{{image_url}}" class="retrieval_original_image" width=120>
+                            <p class="retrieval_item_text">
+                            <span id="content_id" style="display:none">{{content_id}}</span>
+                            rank<span class="badge">{{@index}}</span><br>
+                            color:<span class="badge">{{color_similarity_score}}</span><br>
+                            pattern:<span class="badge">{{similarity_score}}</span><br>
+                            <span id="user_state" style="display:none">-</span>
+                            <img class="cls_img_good" id="img_good" width=15 src="/IR/img/thumbs_up1_gray.png" onmouseover="javascript: thumbs_onhover(this);" onmouseout="javascript: thumbs_onunhover(this);" onclick="javasript: thumbs_onclick(this);">
+                            <img class="cls_img_bad" id="img_bad" width=15 src="/IR/img/thumbs_down1_gray.png" onmouseover="javascript: thumbs_onhover(this);" onmouseout="javascript: thumbs_onunhover(this);" onclick="thumbs_onclick(this);">
+                            <p><label for="good_user_comment">Good:</label><input id="good_user_comment" type="text" placeholder="Put your good point here..." class="form-control input-wide" autocomplete="on" value=""></p>
+                            <p><label for="bad_user_comment">Bad:</label><input id="bad_user_comment" type="text" placeholder="Put your improvements here..." class="form-control input-wide" autocomplete="on" value=""></p>
+                            </p>
+                            
+                        </div>
+                        {{/each}}
+                    </div>
+                </div>
+            </section>
+        </script>
+        <style type="text/css">
+            .grid-item {
+                padding: 0;
+            }
+            
+            .grid-item-img-onpage {
+                padding: 0;
+                width: 70px;
+                height: 70px;
+            }
+
+            .grid-item-img-onpage img {
+                padding: 0;
+                width: 70px;
+                height: 70px;
+            }
+
+            .fixed{
+                position: fixed;
+                bottom: 0;
+                right: 0;
+                width: 200px;
+                background-color: white;
+            }
+
+            .sidebar{
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                width: 240px;
+                background-color: white;
+            }
+
+
+            #retrived_deepfeature .badge {
+                font-size: 10px;
+            }
+
+            #retrived_deepfeature img {
+                margin:0 auto;
+            }
+            .retrieval_item_text {
+                font-family: "Open Sans","Helvetica Neue",Helvetica,Arial,sans-serif;
+                text-align: center;
+                color: #777;
+                display: block;
+                    -webkit-margin-before: 1em;
+                    -webkit-margin-after: 1em;
+                    -webkit-margin-start: 0px;
+                    -webkit-margin-end: 0px;
+                margin: 0 0 11px;
+                font-size: 10px;
+            }
+        </style>
+        <script type="text/javascript">
+            String.prototype.format = function() {
+                var formatted = this;
+                for( var arg in arguments ) {
+                    formatted = formatted.replace("{" + arg + "}", arguments[arg]);
+                }
+                return formatted;
+            }
+
+            function onRetrievalResult_Hover(e) {
+                session_obj = $("#"+e.data.id);
+                $(session_obj).remove("section");
+            }
+
+            function getCommentedObjects(e) {
+                var fulllist = e.find("#retrived_deepfeature .grid-item");
+                var commented_list = new Array();
+
+                for( index=0; index < fulllist.length; index++ ) {
+                    grid_item = $(fulllist[index]);
+                    obj = grid_item.find("#user_state");
+                    if( obj.text() == "G" || obj.text() == "B" ) {
+                        image_url = grid_item.find("#retrieved_image_url").text();
+                        good_comment = grid_item.find("#good_user_comment").val();
+                        bad_comment = grid_item.find("#bad_user_comment").val();
+                        good_or_bad = false;
+                        if( obj.text() == "G" ) {
+                            good_or_bad = true;
+                        }
+                        commented_list.push( { imageurl: image_url,
+                                good_opinion: good_comment,
+                                bad_opinion: bad_comment,
+                                good_or_bad: good_or_bad });
+                    }
+                }
+
+                return commented_list;
+            }
+
+            function ShowDialog(title, content) {
+                $('#dialog').dialogBox({
+                    hasClose: true,
+                    hasBtn: true,
+                    confirmValue: 'OK',
+                    confirm: function(){
+                    },
+                    title: title,
+                    content: content
+                });
+            }
+
+            function onSubmit_Hover(e) {
+                e.preventDefault();
+                s = $("#"+e.data.id);
+                var service_id = s.find("#service_id").text();
+                var image_url = s.find("#param_query_url").text();
+                var category = s.find("#param_category").text();
+                var commented_list = getCommentedObjects( s );
+                var tags = s.find("#query_tag").val();
+                var userid = $("#userid").val();
+
+                if( userid.length == 0 ) {
+                    ShowDialog("INFORMATION", "사용자 이름을 넣어 주세요.");
+                    return;
+                }
+
+                console.log("service id:" + service_id);
+                console.log("image_url:" + image_url);
+                console.log("category:" + category);
+                console.log("tags:" + tags);
+                console.log("commented_list:" + commented_list);
+
+
+                myserver.Submit( service_id, userid, image_url, category, tags, commented_list );
+                s.remove();
+            }
+
+            function page_onclick(element) {
+                var p = element.parentElement;
+                var category = p.querySelector("#category").textContent;
+                var image_url = p.querySelector("#image_url").textContent;
+
+                console.log("category:" + category);
+                console.log("imageurl:" + image_url);
+                SetQuery(image_url, category);
+            }
+
+
+            function thumbs_onclick(element) {
+                var p = element.parentElement;
+                var s = p.querySelector("#user_state");
+                if(s.textContent != "-") {
+                    s.textContent = "-";
+                } else {
+                    if( element.getAttribute("class") == "cls_img_good" ) {
+                        s.textContent = "G";
+                    } else if( element.getAttribute("class") == "cls_img_bad" ) {
+                        s.textContent = "B";
+                    } 
+                }
+                thumbs_updateUI(element);
+            }
+
+            function thumbs_onhover(element) {
+                if( element.getAttribute("class") == "cls_img_good" ) {
+                    element.setAttribute('src', '/IR/img/thumbs_up1.png');
+                } else if( element.getAttribute("class") == "cls_img_bad" ) {
+                    element.setAttribute('src', '/IR/img/thumbs_down1.png');
+                } 
+            }
+
+            function thumbs_updateUI(element) {
+                var p = element.parentElement;
+                var s = p.querySelector("#user_state");
+                var goodbtn = p.querySelector("#img_good");
+                var badbtn = p.querySelector("#img_bad");
+                if( s.textContent == "-" ) {
+                    goodbtn.setAttribute('src', '/IR/img/thumbs_up1_gray.png');
+                    badbtn.setAttribute('src', '/IR/img/thumbs_down1_gray.png');
+                } else if( s.textContent == "G" ) {
+                    goodbtn.setAttribute('src', '/IR/img/thumbs_up1.png');
+                    badbtn.setAttribute('src', '/IR/img/thumbs_down1_gray.png');
+                } else if( s.textContent == "B") {
+                    goodbtn.setAttribute('src', '/IR/img/thumbs_up1_gray.png');
+                    badbtn.setAttribute('src', '/IR/img/thumbs_down1.png');
+                } 
+            }
+
+            function thumbs_onunhover(element) {
+                thumbs_updateUI(element);
+            }
+
+            function RetrievalImage(imageurl, category) {
+                myserver.RetrievalImage(imageurl, category);
+            }
+
+            function AddTab(sectionid, imageurl) {
+                var li_tag = $("<li id=\"{0}\">".format(sectionid));
+                li_tag.append($("<a href='#'><img src='{0}' height=\"15px\"><span style=\"display:none;\"></span></a>".format(imageurl)));
+                $("#result_tab").append(li_tag);
+            }
+
+            function SetTagInput(sectionid) {
+                $('#{0} #query_tag'.format(sectionid)).tagsInput({width: 'auto', height: 'auto'});
+            }
+
+
+            function onUpdateRetrievalList(retrived_list) {
+                var image_url_obj = $("#image_url");
+                var image_url = image_url_obj.val();
+                var sectionid = image_url.hash();
+                var context = { classname: "deepfeature_result",
+                    category: $("#retrieval_category").text(),
+                    service_id: "deep_color_feature",
+                    section_id: sectionid,
+                    query_url: image_url,
+                    container_id_list: retrived_list };
+                var html = retrieval_template( context );
+
+                var sidebar = $("#sidebar-wrapper");
+                var sidebar_offset = sidebar.offset();
+                $("#result_container").prepend( html );
+
+
+                var section_obj = $("#"+sectionid);
+
+                section_obj.find("#btn_submit").on("click", { id: sectionid}, onSubmit_Hover);
+                section_obj.find("#btn_close").on("click", {id: sectionid}, onRetrievalResult_Hover);
+
+                var grid = $('.grid').masonry( { 'itemSelector': '.grid-item',
+                        columnWidth: 200 } );
+                //setTimeout( function() { grid.masonry('layout'); }, 3000);
+                grid.imagesLoaded( function() { grid.masonry('layout'); });
+
+                //setTimeout( function() { grid.masonry('layout'); }, 3000);
+
+                $("#"+sectionid+" .retrieval_original_image").mouseover( {imageurl: image_url }, imageoverlay );
+                //AddTab( sectionid, image_url );
+                SetTagInput( sectionid );
+
+                sidebar.offset( sidebar_offset );
+
+            }
+            
+            function onConnect(param) {
+                if( param.result ) {
+                    console.log("connected");
+                    console.log("sessionid: {0}".format( param.sessionid ));
+                    myserver.SetPagination("deep_color_feature_v151215", item_per_page);
+                } else {
+                    console.log("failed to connected");
+                    alert("Cannot connect to server");
+                }
+            }
+
+            function onGoPage() {
+                no_page = $("#go-page").val();
+                $("#smartpage").bootpag( {page:no_page} );
+                ChangePage(no_page);
+            }
+            
+            function onPage(param) {
+                if( param.result ) {
+                    var list = $("#worklist");
+                    list.empty();
+                    for(var index in param.list) {
+                        var context = { image_url: param.list[index].image_url,
+                                category: param.list[index].category };
+                        var html = page_template( context );
+                        list.append(html);
+                    }
+                    list.masonry( {'itemSelector': '.grid-item-img-onpage'} );
+                    list.imagesLoaded( function() { list.masonry('layout'); } );
+                }
+            }
+            
+            function onPagination(param) {
+                if( param.result ) {
+                    max_page = Math.ceil(param.maxpage/item_per_page);
+                    $("#smartpage").bootpag( {
+                        first: "←",
+                        last: "→",
+                        maxVisible: 30, 
+                        firstLastUse: true,
+                        page:1,
+                        total: max_page,
+                        leaps: true,
+                        }).on("page", onPaging);
+
+                    myserver.Page(0,item_per_page);
+                }
+            }
+
+            function onRequestRetrieval() {
+                result = RetrievalImage( $("#image_url").val(),$("#retrieval_category").text() );
+            }
+
+            function ChangePage(no_page) {
+                myserver.Page( (no_page-1) * item_per_page, no_page*item_per_page); 
+            }
+
+            function onPaging(event, newPageValue) {
+                ChangePage( newPageValue );
+            }
+
+            function onSubmit( param ) {
+            }
+
+            function CallBack(service_name, event_type, result, textStatus, jqXHR) {
+                switch(service_name) {
+                case 'retrievalimage': 
+                    if( event_type == "success" && result.result ) {
+                        onUpdateRetrievalList( result.content_id_list );
+                    }
+                    break;
+                case 'submit':
+                    if( event_type == "success" ) {
+                        onSubmit( result );
+                    }else {
+                        result.result = false;
+                        onSubmit( result );
+                    }
+                    break;
+                case 'connect': 
+                    if( event_type == "success" ) {
+                        onConnect( result );
+                    }else {
+                        result.result = false;
+                        onConnect( result );
+                    }
+                    break;
+                case 'pagination':
+                    if( event_type == "success" ) {
+                        onPagination(result);
+                    }
+                    break;
+                case 'onpage':
+                    if( event_type == "success" ) {
+                        onPage(result);
+                    }
+                    break;
+                }
+            }
+
+            function ShowNoti() {
+                ShowDialog("NOTICE", "<ul><li>다양한 사진이 중요!! 전체 비슷한 영상 50개중 한 3개만 체크 해도 됩니다.</li><li>확실한 것만 <img width=15 src='/IR/img/thumbs_up1.png'>/<img width=15 src='/IR/img/thumbs_down1.png'>적용합니다.</li><li>Just Pass! 애매한 것은 체크하지 않습니다.</li><li>완벽히 똑같은 영상이라 판단하는 것은 체크하지 않습니다.</li><li>이름을 입력해야 한다(왼쪽상단에 위치, 단순 통계목적).</li><li>panty, pants는 하지 않습니다.</li></ul>");
+            }
+
+            function onInit() {
+                myserver.SetCallBack( CallBack );
+                myserver.Connect(_remote_server);
+                $(".dropdown-menu li a").click(function(){
+                    $(this).parents(".dropdown").find('.selection').text($(this).text());
+                    $(this).parents(".dropdown").find('.selection').val($(this).text());
+                    });
+
+                $("#btn_retrieval").click( onRequestRetrieval );
+                $("#btn-go-page").click( onGoPage );
+                retrieval_template = Handlebars.compile( $("#entry_retrieval").html() );
+                page_template = Handlebars.compile( $("#page_entry").html() );
+                //$("#smartpage").smartpaginator({ totalrecords: 100, recordsperpage: 4, initval:0 , next: 'Next', prev: 'Prev', first: 'First', last: 'Last', theme: 'black', onchange: onChange });
+                setTimeout( ShowNoti(), 0);
+
+            }
+            
+            function SetQuery(image_url, category) {
+                SetQueryImageUrl(image_url);
+                SetQueryCategory(category);
+            }
+
+            function SetQueryImageUrl(image_url) {
+                $('#image_url').val( image_url );
+            }
+
+            function SetQueryCategory(category) {
+                $('#retrieval_category').text( category );
+            }
+        </script>
+    </head>
+    <body>
+        <div id="warpper">
+        <div id="page-content-wrapper">
+            <div class="container-fluid" id="main_top">
+                <div id="dialog"></div>
+                <section id="demo">
+                    <div class="container-fluid">
+                        <div class="row">
+                            <div class="col-sm-offset-3 col-sm-5 col-md-5 col-md-offset-2"> <input id="image_url" type="text" placeholder="Paste a image url here..." class="form-control input-wide" autocomplete="off" value="http://cfile239.uf.daum.net/image/0303054F5181EC521AF7D4"> 
+                            </div>
+                            <div class="col-sm-1 col-md-1"> 
+                                <div class="dropdown">
+                                    <button class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">Category: <span class="selection" id="retrieval_category"></span><span class="caret"></span></button>
+                                    <ul class="dropdown-menu">
+                                      <li><a href="#">bag</a></li>
+                                      <li><a href="#">multitop</a></li>
+                                      <li><a href="#">shoes</a></li>
+                                      <li><a href="#">skirt</a></li>
+                                      <li><a href="#">onepiece</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="col-sm-1 col-md-1"> 
+                                <button type="button" id="btn_retrieval" class="btn btn-primary">Retrieval</button> 
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div> <!-- container-fluid id=main_top -->
+            <div class="container-fluid">
+                <div class="row">
+                    <div class="container-fluid" id="result_container">
+                    </div>
+                </div>
+            </div> 
+        </div> <!-- page-content-wrapper -->
+        <div id="sidebar-wrapper">
+            <div class="container-fluid">
+                <div class="row">
+                    <div class="col-sm-12">
+                        <input id="userid" type="text" class="" placeholder="your name" value="">
+                    </div>
+                </div>
+                <div class="row" id="worklist">
+                    <div class="col-sm-6">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-12">
+                        <div id="smartpage" width="200px">
+                        </div>
+                    </div>
+                    <div class="col-sm-12">
+                        <label for="go-page">#Page:</label><input id="go-page" type="text" value="">
+                        <button type="button" id="btn-go-page" class="btn btn-primary">Go</button> 
+                    </div>
+                </div>
+            </div>
+        </div> <!-- sidebar-wrapper -->
+        </div> <!-- warpper -->
+
+        <script type="text/javascript">
+        $(document).ready(function(){
+            onInit();
+        });
+        </script>
+    </body>
+</html>

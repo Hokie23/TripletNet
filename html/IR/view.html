@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ko">
+    <head>
+        <title>Image Retrieval</title>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Comptatible" content="IE=10">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="shortcut icon" href="/IR/img/favicon.png" />
+        <link rel="stylesheet" href="/IR/css/bootstrap.min.css">
+        <link rel="stylesheet" href="/IR/css/jquery.tagsinput.css">
+        <link href="css/simple-sidebar.css" rel="stylesheet">
+        <link href="css/smartpaginator.css" rel="stylesheet">
+        <link rel="stylesheet" type="text/css" href="css/jquery.dialogbox.css">
+        <script src="/IR/js/jquery.min.js"></script>
+        <script src="/IR/js/bootstrap.min.js"></script>
+        <script src="/IR/js/masonry.pkgd.min.js"></script>
+        <script src="/IR/js/jquery.tagsinput.js"></script>
+        <script src="/IR/js/smartpaginator.js"></script>
+        <script src="/IR/js/jquery.bootpag.min.js"></script>
+        <script src="/IR/js/myscript.js"></script>
+        <script src="/IR/js/myserver.js"></script>
+        <script src="/IR/js/jquery.dialogBox.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/2.0.0/handlebars.min.js" type="application/javascript"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.imagesloaded/3.2.0/imagesloaded.pkgd.min.js"></script>
+        <script type="text/javascript">
+            // global area
+            var _remote_server = "10.202.35.87:8080";
+            var max_page = 0;
+            var item_per_page = 9;
+            var retrieval_template;
+            var myserver = new MyServer();
+            myserver._remote_server = _remote_server;
+        </script>
+        <script id="entry_retrieval" type="text/x-handlebars-template">
+            <section class="{{classname}}" id="{{section_id}}">
+                <hr>
+                <div class="container">
+                    <span id="param_query_url" style="display:none">{{query_url}}</span>
+                    <span id="param_category" style="display:none">{{category}}</span>
+                    <div class="row" id="query_deepfeature">
+                        <div class="col-sm-11 col-md-11">
+                            <img src="{{query_url}}" width=120>
+                        </div>
+                        <div class="col-sm-1 col-md-1">
+                            <button class="btn btn-primary close" type="button" id="btn_close" data-toggle="close">&times;</button>
+                        </div>
+                        <div class="col-sm-11 col-md-11">
+                            <input id="query_tag" type="text" placeholder="Put your tag of this here..." class="form-control input-wide" autocomplete="on" value="">
+                            service_id: <span id="service_id">{{service_id}}</span>
+                        </div>
+                    </div>
+                    <div class="row grid" id="retrived_deepfeature" style="">
+                        {{#each container_id_list}}
+                        <div class="col-sm-2 col-md-2 grid-item" width=200 height=300 style="text-align:center;">
+                            <span id="retrieved_image_url" style="display:none">{{image_url}}</span>
+                            <img src="{{image_url}}" class="retrieval_original_image" width=120>
+                            <p class="retrieval_item_text">
+                            <span id="content_id" style="display:none">{{content_id}}</span>
+                            rank<span class="badge">{{@index}}</span><br>
+                            pattern:<span class="badge">{{distance}}</span><br>
+                            </p>
+                            
+                        </div>
+                        {{/each}}
+                    </div>
+                </div>
+            </section>
+        </script>
+        <style type="text/css">
+            .grid-item {
+                padding: 0;
+            }
+            
+            .grid-item-img-onpage {
+                padding: 0;
+                width: 70px;
+                height: 70px;
+            }
+
+            .grid-item-img-onpage img {
+                padding: 0;
+                width: 70px;
+                height: 70px;
+            }
+
+            #retrived_deepfeature .badge {
+                font-size: 10px;
+            }
+
+            #retrived_deepfeature img {
+                margin:0 auto;
+            }
+            .retrieval_item_text {
+                font-family: "Open Sans","Helvetica Neue",Helvetica,Arial,sans-serif;
+                text-align: center;
+                color: #777;
+                display: block;
+                    -webkit-margin-before: 1em;
+                    -webkit-margin-after: 1em;
+                    -webkit-margin-start: 0px;
+                    -webkit-margin-end: 0px;
+                margin: 0 0 11px;
+                font-size: 10px;
+            }
+        </style>
+        <script type="text/javascript">
+            String.prototype.format = function() {
+                var formatted = this;
+                for( var arg in arguments ) {
+                    formatted = formatted.replace("{" + arg + "}", arguments[arg]);
+                }
+                return formatted;
+            }
+
+            function onRetrievalResult_Hover(e) {
+                session_obj = $("#"+e.data.id);
+                $(session_obj).remove("section");
+            }
+
+            function ShowDialog(title, content) {
+                $('#dialog').dialogBox({
+                    hasClose: true,
+                    hasBtn: true,
+                    confirmValue: 'OK',
+                    confirm: function(){
+                    },
+                    title: title,
+                    content: content
+                });
+            }
+
+            function RetrievalImage(imageurl, category) {
+                myserver.RetrievalImage(imageurl, category);
+            }
+
+            function onUpdateRetrievalList(retrived_list) {
+                var image_url_obj = $("#image_url");
+                var image_url = image_url_obj.val();
+                var sectionid = image_url.hash();
+                var context = { classname: "deepfeature_result",
+                    category: $("#retrieval_category").text(),
+                    service_id: "deep_color_feature",
+                    section_id: sectionid,
+                    query_url: image_url,
+                    container_id_list: retrived_list };
+                var html = retrieval_template( context );
+
+                $("#result_container").prepend( html );
+
+
+                var section_obj = $("#"+sectionid);
+
+                //section_obj.find("#btn_submit").on("click", { id: sectionid}, onSubmit_Hover);
+                section_obj.find("#btn_close").on("click", {id: sectionid}, onRetrievalResult_Hover);
+
+                var grid = $('.grid').masonry( { 'itemSelector': '.grid-item',
+                        columnWidth: 200 } );
+                //setTimeout( function() { grid.masonry('layout'); }, 3000);
+                grid.imagesLoaded( function() { grid.masonry('layout'); });
+
+                //setTimeout( function() { grid.masonry('layout'); }, 3000);
+
+                $("#"+sectionid+" .retrieval_original_image").mouseover( {imageurl: image_url }, imageoverlay );
+            }
+            
+            function onRequestRetrieval() {
+                result = RetrievalImage( $("#image_url").val(),$("#retrieval_category").text() );
+            }
+
+            function CallBack(service_name, event_type, result, textStatus, jqXHR) {
+                switch(service_name) {
+                case 'retrievalimage': 
+                    if( event_type == "success" && result.result ) {
+                        onUpdateRetrievalList( result.retrieved_list );
+                    }
+                    break;
+                }
+            }
+
+            function onInit() {
+                myserver.SetCallBack( CallBack );
+                $(".dropdown-menu li a").click(function(){
+                    $(this).parents(".dropdown").find('.selection').text($(this).text());
+                    $(this).parents(".dropdown").find('.selection').val($(this).text());
+                    });
+
+                $("#btn_retrieval").click( onRequestRetrieval );
+                retrieval_template = Handlebars.compile( $("#entry_retrieval").html() );
+            }
+            
+            function SetQuery(image_url, category) {
+                SetQueryImageUrl(image_url);
+                SetQueryCategory(category);
+            }
+
+            function SetQueryImageUrl(image_url) {
+                $('#image_url').val( image_url );
+            }
+
+            function SetQueryCategory(category) {
+                $('#retrieval_category').text( category );
+            }
+        </script>
+    </head>
+    <body>
+        <div id="warpper">
+        <div id="page-content-wrapper">
+            <div class="container-fluid" id="main_top">
+                <div id="dialog"></div>
+                <section id="demo">
+                    <div class="container-fluid">
+                        <div class="row">
+                            <div class="col-sm-offset-3 col-sm-5 col-md-5 col-md-offset-2"> <input id="image_url" type="text" placeholder="Paste a image url here..." class="form-control input-wide" autocomplete="off" value="http://cfile239.uf.daum.net/image/0303054F5181EC521AF7D4"> 
+                            </div>
+                            <div class="col-sm-1 col-md-1"> 
+                                <div class="dropdown">
+                                    <button class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">Category: <span class="selection" id="retrieval_category"></span><span class="caret"></span></button>
+                                    <ul class="dropdown-menu">
+                                      <li><a href="#">bag</a></li>
+                                      <li><a href="#">multitop</a></li>
+                                      <li><a href="#">shoes</a></li>
+                                      <li><a href="#">skirt</a></li>
+                                      <li><a href="#">onepiece</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="col-sm-1 col-md-1"> 
+                                <button type="button" id="btn_retrieval" class="btn btn-primary">Retrieval</button> 
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div> <!-- container-fluid id=main_top -->
+            <div class="container-fluid">
+                <div class="row">
+                    <div class="container-fluid" id="result_container">
+                    </div>
+                </div>
+            </div> 
+        </div> <!-- page-content-wrapper -->
+        </div> <!-- warpper -->
+
+        <script type="text/javascript">
+        $(document).ready(function(){
+            onInit();
+        });
+        </script>
+    </body>
+</html>
