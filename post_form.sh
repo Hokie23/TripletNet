@@ -32,5 +32,6 @@
 #url="http://cfile204.uf.daum.net/image/182A0D4D509B1689348F89"
 #url="http://gdimg1.gmarket.co.kr/goods_image2/large_jpgimg/737/804/737804974.jpg"
 #url="http://image.fi.co.kr/ImgData/549/35966_1_673.jpg"
-url="http://cfile3.uf.tistory.com/image/1265170C4A5CF4B114DDFA"
+#url="http://cfile3.uf.tistory.com/image/1265170C4A5CF4B114DDFA"
+url="http://imgcdn.kantukan.co.kr/shop/product_img/1448696452_17671.jpg"
 curl http://localhost:8080/query -d $url

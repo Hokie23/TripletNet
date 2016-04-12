@@ -7,6 +7,8 @@ require 'loadutils'
 require "stringutils"
 require 'webutils'
 require "xlua"
+require 'nngraph'
+require 'AttentionLSTM'
 
 local json = require('JSON.lua')
 
@@ -27,7 +29,7 @@ cmd:text()
 cmd:text('==>Options')
 cmd:option('-dim', 128, 'model dimension')
 cmd:option('-batch', 1024*50, 'compare batch size')
-cmd:option('-max_feature', 2000000, 'model dimension')
+cmd:option('-max_feature', 1492181, 'model dimension')
 cmd:option('-feature_list', '', 'write to result')
 cmd:option('-model', '', 'model file name')
 
@@ -87,14 +89,23 @@ while true do
     if math.fmod(count,2000) == 0 then
         xlua.progress(count, 2000000)
     end
-   -- if count == 200000 then
-   --     break
-   -- end
+
+    if count >= max_feature then
+        break
+    end
+
+    --if count == 20000 then
+    --    break
+    --end
 end
 
 print ("count:", count)
 file:close()
 
+function view(req, res)
+    local template = './html/hello.html'
+    res.render( template, { count = count } )
+end
 
 function hello(req, res)
     local template = './html/hello.html'
@@ -147,7 +158,8 @@ function distance_from_pool(X)
 
     print( "pool:", feature_pool:size(1))
     local mind = 9999
-    for i=1,feature_pool:size(1),compare_batch do
+    local max_images = math.min(count, feature_pool:size(1))
+    for i=1,max_images,compare_batch do
         local bsize = math.min( feature_pool:size(1) - i, compare_batch )
         local z = feature_pool[{{i,i+bsize-1},{}}]
         if bsize ~= compare_batch then
@@ -171,12 +183,12 @@ function distance_from_pool(X)
                 return a.value < b.value 
             end )
     local result = {}
-    for k=1,10 do
+    for k=1,100 do
         print ("bucket", bucket[k])
         index = bucket[k].index
         if index > 0 then
             table.insert(result, {rank=k,content_id=meta_pool[index].content_id, mid_category=meta_pool[index].mid_category,
-                category=meta_pool[index].category, imagepath=meta_pool[index].imagepath, distance=bucket[k].value} )
+                category=meta_pool[index].category, image_url="http://10.202.35.87/october_11st/" .. meta_pool[index].imagepath, distance=bucket[k].value} )
         end
     end
     print ("end---")
@@ -184,25 +196,44 @@ function distance_from_pool(X)
     return result
 end
 
+
 function query(req, res)
-    local img_url = req.body
+    collectgarbage()
+    res.header('Access-Control-Allow-Origin', '*')
+    res.header('Content-Type', 'application/json')
+    local ok, param_value = pcall(json.decode,json,req.body)
+    if ok == false then
+        print ("failed to query")
+        result = { result=false }
+        res.send(result)
+        return
+    end
+    local img_url = param_value.image_url
     print ("image_url", img_url)
     --buf, header = DownloadFileFromURL(img_url)
     ok, body, header, status, code = pcall(HTTPRequest,'GET', img_url)
     if ok == false then
-        res.send(header)
+        print ("request failed to get image url:", img_url)
+        result = { result=false }
+        res.send(result)
         return
     end
     if code ~= 200 then
-        res.send(header)
+        print ("code:", code)
+        result = { result=false }
+        res.send(result)
         return
     end
     local content_type = header["content-type"]
-    if content_type == 'image/jpeg' or content_type == 'image/jpg' then
+    if string.find(content_type,'image/jpeg') ~= nil or string.find(content_type,'image/jpg') ~= nil then
         imgext = ".jpg"
-    elseif content_type == 'image/png' then
+    elseif string.find(content_type,'image/png') ~= nil then
         imgext = ".png"
+    elseif string.find(content_type,'image/gif') ~= nil then
+        imgext = ".gif"
     else
+        print ("header", header)
+        print ("uncompatible image format", content_type)
         res.send( string.format("uncompatible image format: %s", content_type) )
         return
     end
@@ -227,6 +258,7 @@ function query(req, res)
     local ok, retrieval = pcall( retrieval, status )
 
     result = { query=img_url,
+            result=true,
             retrieved_list=retrieval }
 
     print (header)
@@ -235,4 +267,4 @@ end
 
 app.get('/',hello)
 app.post('/query',query)
-app.listen()
+app.listen({host='0.0.0.0', port=8080})
