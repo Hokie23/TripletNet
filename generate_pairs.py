@@ -78,7 +78,7 @@ for key, val in meta.iteritems():
         line += "<td class='positive'>"
         for img_url in val["P"]:
             line += "<img class='img_positive' src='{}{}'>".format(image_baseurl, img_url)
-        line += "</td><td class='td_negative'>"
+        line += "</td><td class='negative'>"
         for img_url in val["N"]:
             line += "<img class='img_negative' src='{}{}'>".format(image_baseurl, img_url)
         line += "</td></tr>\n"
