@@ -3,9 +3,11 @@ local http = require('socket.http')
 local ltn12 = require('ltn12')
 
 function HTTPRequest(request_method, url)
+    local ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.110 Safari/537.36"
     local body = {}
     local client, code, headers, status = http.request( {
         method=request_method,
+        headers= { ["USER-AGENT"]=ua},
         url=url,
         sink=ltn12.sink.table(body)
         })

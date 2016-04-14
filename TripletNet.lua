@@ -23,8 +23,8 @@ local function CreateTripletNet(EmbeddingNet, inputs, distMetric)
   return nets, dists, embeddings
 end
 
-function TripletNet:__init(EmbeddingNet, num, distMetric, collectFeat)
-    self.num = num or 3
+function TripletNet:__init(EmbeddingNet, distMetric)
+    self.num = 3
     self.distMetric = distMetric or nn.PairwiseDistance(2)
     self.EmbeddingNet = EmbeddingNet
     self.nets = {}

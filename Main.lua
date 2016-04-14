@@ -7,6 +7,7 @@ require 'optim'
 require 'xlua'
 require 'trepl'
 require 'DistanceRatioCriterion'
+require 'PairwiseDistanceOffset'
 require 'TripletEmbeddingCriterion'
 require 'cunn'
 require 'WorkerParam'
@@ -18,6 +19,9 @@ require 'cudnn'
 cudnn.benchmark = true
 cudnn.fastest = true
 cudnn.verbose = true
+
+
+istest = true
 
 local debugger = require( 'fb.debugger' )
 
@@ -40,7 +44,7 @@ cmd:option('-modelsFolder',       './Models/',            'Models Folder')
 --cmd:option('-network',            'resception_128_relu.lua',            'embedding network file - must return valid network.')
 --cmd:option('-network',            'resception_135_grid.lua',            'embedding network file - must return valid network.')
 --cmd:option('-network',            'layerdrop_135_grid.lua',            'embedding network file - must return valid network.')
-cmd:option('-network',            'attention_128_grid.lua',            'embedding network file - must return valid network.')
+cmd:option('-network',            'attention_128_offset.lua',            'embedding network file - must return valid network.')
 cmd:option('-LR',                 0.001,                    'learning rate')
 cmd:option('-LRDecay',            1e-6,                   'learning rate decay (in # samples)')
 cmd:option('-weightDecay',        1e-4,                   'L2 penalty on the weights')
@@ -71,7 +75,7 @@ cmd:option('-size',               12,                 'size of training list' )
 --cmd:option('-size',               64,                 'size of training list' )
 --cmd:option('-size',               640,                 'size of training list' )
 --cmd:option('-size',               64000,                 'size of training list' )
-cmd:option('-normalize',          1,                      '1 - normalize using only 1 mean and std values')
+--cmd:option('-normalize',          1,                      '1 - normalize using only 1 mean and std values')
 cmd:option('-whiten',             false,                  'whiten data')
 cmd:option('-augment',            true,                  'Augment training data')
 cmd:option('-preProcDir',         './PreProcData/',       'Data for pre-processing (means,P,invP)')
@@ -90,6 +94,7 @@ print ("REPL port", opt.port)
 
 
 opt.network = opt.modelsFolder .. paths.basename(opt.network, '.lua')
+
 opt.save = paths.concat('./Results', opt.save)
 opt.preProcDir = paths.concat(opt.preProcDir, opt.dataset .. '/')
 
@@ -106,11 +111,8 @@ local EmbeddingNet = require(opt.network)
 --local EmbeddingWeights, EmbeddingGradients = EmbeddingNet:getParameters()
 EmbeddingNet:cuda()
 --local TripletNet = nn.TripletNet2(EmbeddingNet)
-local TripletNet = nn.TripletNet(EmbeddingNet)
---local nLoss = nn.Sequential()
---nLoss:add( nn.SelectTable(1) )
---nLoss:add( nn.DistanceRatioCriterion() )
---local Loss = nLoss
+local TripletNet = nn.TripletNet(EmbeddingNet,nn.PairwiseDistanceOffset(2) )
+--local Loss = nn.DistanceRatioCriterion()
 local Loss = nn.DistanceRatioCriterion()
 --local Loss = nn.TripletEmbeddingCriterion(0.2)
 
@@ -146,9 +148,12 @@ local SizeTest = 6400
 
 
 ------------------------- Output files configuration -----------------
-os.execute('mkdir -p ' .. opt.save)
-os.execute('cp ' .. opt.network .. '.lua ' .. opt.save)
-cmd:log(opt.save .. '/Log.txt', opt)
+if istest ~= false then
+    os.execute('mkdir -p ' .. opt.save)
+    os.execute('cp ' .. opt.network .. '.lua ' .. opt.save)
+    cmd:log(opt.save .. '/Log.txt', opt)
+end
+
 local network_filename = paths.concat(opt.save, "Embedding.t7")
 local weights_filename = paths.concat(opt.save, 'Weights.t7')
 local log_filename = paths.concat(opt.save,'ErrorProgress')
@@ -289,14 +294,16 @@ function Train(DataC, epoch)
 
         while true do
             --if Weights[1] ~= EmbeddingWeights[1] then
---                print (first_weight)
---                print ('original', Weights[1])
---                --local W2, G2 = TripletNet:getParameters()
---                local W2, G2 = TripletNet.nets[3]:getParameters()
---                print ('type(Weight):', Weights:type(), 'type(W2):', W2:type())
---                print ('after getparameters', Weights[1], W2[1])
-----
+                print (first_weight)
+                print ('original', Weights[1])
+                --local W2, G2 = TripletNet:getParameters()
+                local W2, G2 = TripletNet.nets[3]:getParameters()
+                print ('type(Weight):', Weights:type(), 'type(W2):', W2:type())
+                torch.save('tmp.t7', W2)
+                local W3 = torch.load('tmp.t7')
+                print ('after getparameters', Weights[1], W2[1], W3[1])
 --
+
                 --W2 = W2:float()
                 --print ('after float', Weights[1], W2[1], EmbeddingWeights[1])
                 --local w = Weights:float()
