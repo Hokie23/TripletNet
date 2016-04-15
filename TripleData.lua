@@ -16,7 +16,7 @@ local TestData
 local TrainData
 local Classes
 local ImagePool = {}
-local lu = loadutils(imagePath )
+local lu = loadutils( {imagePath} )
 
 function dist(a, b)
     --local d = (a -b)*(a-b)

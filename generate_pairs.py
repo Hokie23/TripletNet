@@ -73,7 +73,7 @@ fout.write("""<html>
 itemcount = 0
 outcount = 0
 for key, val in meta.iteritems():
-    if itemcount % 50 == 0:
+    if itemcount % 10 == 0:
         line = "<tr><td class='td_anchor'><img class='img_anchor' src='{}{}'></td>".format(image_baseurl, key)
         line += "<td class='positive'>"
         for img_url in val["P"]:

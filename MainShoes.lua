@@ -67,7 +67,7 @@ cmd:option('-load',               '',                     'load existing net wei
 cmd:option('-save',               os.date():gsub(' ',''), 'save directory')
 
 cmd:text('===>Data Options')
-cmd:option('-dataset',            'fashion',              'Dataset - Cifar10 or Cifar100')
+cmd:option('-dataset',            'shoes',              'Dataset - Shoes')
 --cmd:option('-size',               640000,                 'size of training list' )
 --cmd:option('-size',               640,                 'size of training list' )
 --cmd:option('-size',               180,                 'size of training list' )
@@ -141,7 +141,7 @@ end
 --TripletNet:RebuildNet() --if using TripletNet instead of TripletNetBatch
 
 --local data = require 'TripleData'
-local data = require 'TripleDataWithProperties'
+local data = require 'TripleShoesData'
 local SizeTrain = opt.size or 640000
 --local SizeTest = SizeTrain*0.1
 local SizeTest = 6400 

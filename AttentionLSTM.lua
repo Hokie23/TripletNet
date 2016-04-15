@@ -29,11 +29,11 @@ function AttentionLSTM:__init(deathRate, nChannels, nOutputChannels, nHidden, na
 
     -- batch (32) x hiddens (128) x height (8) x width (8)
     local h = nn.Reshape(nChannels)(cudnn.SpatialAveragePooling(8, 8, 1, 1, 0, 0)(x)) 
-    -- batch x nChannels x 1 x 1
+    -- h = batch x nChannels x 1 x 1
     local h1 = nn.LinearWithoutBias(nChannels, nHidden)(h)
-    -- batch (32) x hiddens (42)
+    -- h1 = batch (32) x hiddens (42)
     local h2 = nn.Replicate(8*8, 3)(h1)
-    -- batch (32) x hiddens (42) x annotations (49)
+    -- h2 = batch (32) x hiddens (42) x annotations (49)
     local h3 = nn.Reshape(nHidden, 8, 8)(h2)
     -- batch (32) x hiddens (42) x height (8) x width (8)
 

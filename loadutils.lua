@@ -7,15 +7,15 @@ local image_utils = require 'image_utils'
 
 local loadutils = torch.class("loadutils")
 
-function loadutils:__init(defaultPath)
+function loadutils:__init(defaultPathes)
     self.loadSize = GetLoadSize()
     self.sampleSize = GetSampleSize()
-    self.defaultPath = defaultPath
+    self.defaultPathes = defaultPathes
     self.ImageResolution = self.sampleSize
 end
 
-function loadutils:SetDefaultImagePath(path)
-    self.defaultPath = path
+function loadutils:SetDefaultImagePath(pathes)
+    self.defaultPathes = pathes
 end
 
 function loadutils:Resolution()
@@ -30,13 +30,17 @@ function loadutils.isColorImage(img)
 end
 
 function loadutils:LoadNormalizedResolutionImage(filename, jitter)
-    local imagepath = self.defaultPath .. filename
-    --print ("image path", imagepath)
-    if jitter == nil then
-        return preprocess(imagepath)
-    else
-        return preprocess_with_jitter(imagepath, jitter)
+    for i=1,#self.defaultPathes do
+        local imagepath = self.defaultPathes[i] .. filename
+        if path.exists( imagepath ) ~= false then
+            if jitter == nil then
+                return preprocess(imagepath)
+            else
+                return preprocess_with_jitter(imagepath, jitter)
+            end
+        end
     end
+    return nil
 end
 
 function loadutils.dist(a, b)
@@ -45,31 +49,41 @@ function loadutils.dist(a, b)
 end
 
 function loadutils:LoadNormalizedResolutionImageCenterCrop(filename)
-    local imagepath = self.defaultPath .. filename
-    --print ("load_image:", imagepath)
-    local ok, input = pcall(image_utils.loadImage, imagepath, self.loadSize, 1.0)
-    if ok == false then
-        print ("error: 1")
-        return nil
-    end
+    local output = nil
+    for i=1,#self.defaultPathes do
+        local imagepath = self.defaultPathes[i] .. filename
+        if path.exists( imagepath ) ~= false then
+            local ok, input = pcall(image_utils.loadImage, imagepath, self.loadSize, 1.0)
+            if ok == false then
+                print ("error: 1")
+                return nil
+            end
 
-    ok, output = pcall(image_utils.center_crop,input, self.sampleSize)
-    if ok == false then
-        print ("error: 2")
-        return nil
-    end
+            ok, output = pcall(image_utils.center_crop,input, self.sampleSize)
+            if ok == false then
+                print ("error: 2")
+                return nil
+            end
 
-    if output == nil then
-        print ("output is nil")
-        return nil
-    end
+            if output == nil then
+                print ("output is nil")
+                return nil
+            end
 
-    output = preprocess_mean_std_norm(output)
+            output = preprocess_mean_std_norm(output)
+        end
+    end
     return output
 end
 
 function loadutils:CheckImage(filename)
-    local ok = pcall(image_utils.loadImage,filename, self.loadSize, 1.0)
+    local ok = false
+    for i=1,#self.defaultPathes do
+        local imagepath = self.defaultPathes[i] .. filename
+        if path.exists( imagepath ) ~= false then
+            ok = pcall(image_utils.loadImage, imagepath, self.loadSize, 1.0)
+        end
+    end
     return ok
 end
 
@@ -90,13 +104,13 @@ function loadutils:LoadPairs(filepath, check_imagefile)
             -- loop body
             if check_image then
                 if imagepoolbyname[a_name] == nil then
-                    if loadutils:CheckImage(self.defaultPath .. a_name) == false then
+                    if loadutils:CheckImage(a_name) == false then
                         return 
                     end
                     imagepoolbyname[a_name] = true
                 end
                 if imagepoolbyname[t_name] == nil then
-                    if loadutils:CheckImage(self.defaultPath .. t_name) == false then
+                    if loadutils:CheckImage(t_name) == false then
                         return 
                     end
                     imagepoolbyname[t_name] = true
@@ -105,6 +119,7 @@ function loadutils:LoadPairs(filepath, check_imagefile)
 
             --print ("p_or_n1=", p_or_n, p_or_n=='1')
             table.insert(output_pairs, {a_name, t_name, p_or_n == '1'}) 
+            return 
         end) ()
 
         -- exit loop body
