@@ -1,8 +1,10 @@
 #-*- coding: utf-8 -*-
 
-filename = 'fashion_pair.csv'
-outfilename = './html/IR/pair_lists.html'
-image_baseurl = "http://175.126.56.112/october_11st/"
+#filename = 'fashion_pair.csv'
+filename = 'shoes_pair.train.csv'
+outfilename = './html/IR/shoes_pair_lists.html'
+#image_baseurl = "http://175.126.56.112/october_11st/"
+image_baseurl = "http://10.202.35.87/freebee/"
 f = open(filename, 'rt')
 
 meta = dict()
@@ -11,6 +13,8 @@ count = 0
 for line in f.readlines():
     line = line.rstrip()
     items = line.split(",")
+    if len(items) < 4:
+        continue
     anchor = items[1]
     pair = items[2]
     p_or_n = items[3]
@@ -74,6 +78,7 @@ itemcount = 0
 outcount = 0
 for key, val in meta.iteritems():
     if itemcount % 10 == 0:
+    #if itemcount % 1 == 0:
         line = "<tr><td class='td_anchor'><img class='img_anchor' src='{}{}'></td>".format(image_baseurl, key)
         line += "<td class='positive'>"
         for img_url in val["P"]:

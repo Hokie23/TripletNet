@@ -16,15 +16,19 @@ loss:cuda()
 loss:evaluate()
 
 function distance(X, Y)
-    local d = X:eq(Y):sum(2)
-    return d
+    --local off = torch.cmin(X:eq(0):sum(2), Y:eq(0):sum(2))
+    --local hd = X:eq(Y):sum(2)
+    --local d = (hd- off ):add( -17 ):neg()
+    --return d
+
+    return X:ne(Y):sum(2)
 end
 
-function getKnn(Data, i, k, threshold_distance)
-    local X = Data.data.anchor_name_list[i].properties
+function getKnn(Data, anchor_index, k, threshold_distance)
+    local X = Data.data.anchor_name_list[anchor_index].properties
     local feature_dim = X:size(1)
     local nsz = torch.LongStorage(2)
-    local compare_batch = 2048
+    local compare_batch = 604800
     local batchX = torch.repeatTensor(X, compare_batch, 1):type( 'torch.CudaTensor' )
     local Y = torch.Tensor():type( 'torch.CudaTensor' )
     nsz[1] = compare_batch
@@ -45,7 +49,7 @@ function getKnn(Data, i, k, threshold_distance)
 
     local dbsize = #Data.data.anchor_name_list
     for i=1,dbsize,compare_batch do
-        local bsize = math.min( dbsize - i, compare_batch )
+        local bsize = math.min( dbsize - (i-1), compare_batch )
         if bsize ~= compare_batch then
             batchX = torch.repeatTensor(X, bsize, 1):type( 'torch.CudaTensor' )
             nsz[1] = bsize
@@ -68,17 +72,32 @@ function getKnn(Data, i, k, threshold_distance)
         
     end
     table.sort(bucket, function(a, b) 
-                return a.value > b.value 
+                return a.value < b.value 
             end )
 
     local result = {}
-    for i=1,k do
+    for i=1,#bucket do
         index = bucket[i].index
-        if bucket[i].value < threshold_distance then
-            table.insert(result, index )
+        if #result >= k then
+            break
+        end
+        if bucket[i].index ~= anchor_index then
+            if bucket[i].value < threshold_distance then
+                table.insert(result, {index, bucket[i].value} )
+            end
         end
     end
-    return result
+
+    local neg_result = {}
+    for i=#bucket,k+1,-500 do
+        if #neg_result >= k or bucket[i].value < 3 then
+            break
+        end
+
+        index = bucket[i].index
+        table.insert(neg_result, {index, bucket[i].value} )
+    end
+    return result, neg_result
 
 end
 
@@ -125,13 +144,20 @@ end
 Data = LoadData(filepath)
 
 f_pair_out = torch.DiskFile( pair_output_filename, "w")
-for i=1,#Data.data.anchor_name_list,10000 do
+for i=1,#Data.data.anchor_name_list do
     local a_name = Data.data.anchor_name_list[i].filename
-    result = getKnn(Data, i, 50, 5)
+    result, negresult = getKnn(Data, i, 50, 1)
     for j=1,#result do
-        local p_name = Data.data.anchor_name_list[ result[j] ]
-        str = string.format( '%s,%s,%s,1\n', category_name, a_name, p_name)
+        local p_name = Data.data.anchor_name_list[ result[j][1] ].filename
+        str = string.format( '%s,%s,%s,1,%s\n', category_name, a_name, p_name, result[j][2])
         f_pair_out:writeString( str )
     end
+    for j=1,#negresult do
+        local p_name = Data.data.anchor_name_list[ negresult[j][1] ].filename
+        str = string.format( '%s,%s,%s,0,%s\n', category_name, a_name, p_name, negresult[j][2])
+        f_pair_out:writeString( str )
+    end
+
+    xlua.progress( i, #Data.data.anchor_name_list )
 end
 f_pair_out:close()
