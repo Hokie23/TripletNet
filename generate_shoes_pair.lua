@@ -7,9 +7,13 @@ local debugger = require 'fb.debugger'
 
 torch.setdefaulttensortype('torch.FloatTensor')
 
-filepath = './properties/excel_1459334593242.shoes.train.csv'
-pair_output_filename = 'shoes_pair.train.csv'
+--filepath = './properties/excel_1459334593242.shoes.train.csv'
+--pair_output_filename = 'shoes_pair.train.csv'
+filepath = './properties/excel_1459334593242.shoes.valid.csv'
+pair_output_filename = 'shoes_pair.valid.csv'
 category_name = 'shoes'
+
+db = torch.Tensor():type( 'torch.CudaTensor' )
 
 local loss = nn.PairwiseDistance(1)
 loss:cuda()
@@ -26,50 +30,15 @@ end
 
 function getKnn(Data, anchor_index, k, threshold_distance)
     local X = Data.data.anchor_name_list[anchor_index].properties
-    local feature_dim = X:size(1)
-    local nsz = torch.LongStorage(2)
-    local compare_batch = 604800
-    local batchX = torch.repeatTensor(X, compare_batch, 1):type( 'torch.CudaTensor' )
-    local Y = torch.Tensor():type( 'torch.CudaTensor' )
-    nsz[1] = compare_batch
-    nsz[2] = feature_dim
+    local batchX = torch.repeatTensor(X, db:size(1), 1):type( 'torch.CudaTensor' )
 
     collectgarbage()
     batchX:cuda()
 
-    Y:resize(nsz)
-    Y:cuda()
-
-
-    collectgarbage()
     local bucket = {}
-    for i=1,#Data.data.anchor_name_list do
-        table.insert(bucket,{index=i,value=9999})
-    end
-
-    local dbsize = #Data.data.anchor_name_list
-    for i=1,dbsize,compare_batch do
-        local bsize = math.min( dbsize - (i-1), compare_batch )
-        if bsize ~= compare_batch then
-            batchX = torch.repeatTensor(X, bsize, 1):type( 'torch.CudaTensor' )
-            nsz[1] = bsize
-            Y:resize(nsz)
-            Y:cuda()
-        end
-        for j=1,bsize do
-            local z = Data.data.anchor_name_list[i+j-1].properties
-            Y[j]:copy(z)
-        end
-        batchX:cuda()
-        Y:cuda()
-
-        --print (Y:type(), batchX:type())
-        --d = loss:forward({batchX,Y})
-        d = distance(batchX, Y)
-        for j=1,bsize do
-            bucket[i+j-1].value = d[j][1]
-        end
-        
+    local d = distance(batchX, db)
+    for j=1,d:size(1) do
+        table.insert(bucket,{index=j,value=d[j][1]})
     end
     table.sort(bucket, function(a, b) 
                 return a.value < b.value 
@@ -98,7 +67,6 @@ function getKnn(Data, anchor_index, k, threshold_distance)
         table.insert(neg_result, {index, bucket[i].value} )
     end
     return result, neg_result
-
 end
 
 function LoadData(filepath)
@@ -142,6 +110,23 @@ end
 
 
 Data = LoadData(filepath)
+function build_db()
+    db_size = #Data.data.anchor_name_list
+    local feature_dim = Data.data.anchor_name_list[1].properties:size(1)
+    local nsz = torch.LongStorage(2)
+    nsz[1] = db_size
+    nsz[2] = feature_dim
+    db:resize(nsz)
+    for i=1,db_size do
+        local z = Data.data.anchor_name_list[i].properties
+        db[i]:copy(z)
+    end
+
+    db:cuda()
+end
+
+print ('building db....')
+build_db()
 
 f_pair_out = torch.DiskFile( pair_output_filename, "w")
 for i=1,#Data.data.anchor_name_list do

@@ -1,8 +1,10 @@
 #-*- coding: utf-8 -*-
+import random
 
 #filename = 'fashion_pair.csv'
-filename = 'shoes_pair.train.csv'
-outfilename = './html/IR/shoes_pair_lists.html'
+#filename = 'shoes_pair.train.csv'
+filename = 'shoes_pair.valid.csv'
+outfilename = './html/IR/shoes_pair_lists.valid.html'
 #image_baseurl = "http://175.126.56.112/october_11st/"
 image_baseurl = "http://10.202.35.87/freebee/"
 f = open(filename, 'rt')
@@ -77,7 +79,7 @@ fout.write("""<html>
 itemcount = 0
 outcount = 0
 for key, val in meta.iteritems():
-    if itemcount % 10 == 0:
+    if random.random() > 0.9:
     #if itemcount % 1 == 0:
         line = "<tr><td class='td_anchor'><img class='img_anchor' src='{}{}'></td>".format(image_baseurl, key)
         line += "<td class='positive'>"
@@ -89,6 +91,9 @@ for key, val in meta.iteritems():
         line += "</td></tr>\n"
         fout.write(line)
         outcount += 1
+
+        if outcount > 10:
+            break
     itemcount += 1
 fout.write('</table></body></html>\n')
 fout.close()
