@@ -24,7 +24,6 @@ function image_utils.local_contrast_norm( rgb, kernel_size )
   return image.yuv2rgb(yuv):float()
 end
 
-
 -- used in vgg16Caffe
 function image_utils.preprocess(im)
   local input = image.scale(im,256,256,'bilinear')*255
@@ -89,50 +88,22 @@ end
 
 
 function image_utils.resize_crop(input, loadSize, preserve_aspect_ratio)
-  local output = torch.FloatTensor()
-  local preserve_aspect_ratio = 
-    preserve_aspect_ratio or torch.uniform()
-  if preserve_aspect_ratio > 0.5 then
-    local iW = input:size(3)
-    local iH = input:size(2)
-    if iW < iH then
-      output = image.scale(input, 
-        loadSize[2], loadSize[2] * iH / iW)
+    local output = torch.FloatTensor()
+    local preserve_aspect_ratio = preserve_aspect_ratio or torch.uniform()
+    if preserve_aspect_ratio > 0.5 then
+        local iW = input:size(3)
+        local iH = input:size(2)
+        if iW < iH then
+            output = image.scale(input, loadSize[2], loadSize[2] * iH / iW)
+        else
+            output = image.scale(input, loadSize[3] * iW / iH, loadSize[3])
+        end
     else
-      output = image.scale(input, 
-        loadSize[3] * iW / iH, loadSize[3])
+        output = image.scale(input, loadSize[2], loadSize[3])
     end
-  else
-    output = image.scale(input, loadSize[2], loadSize[3])
-  end
 
-  return output, preserve_aspect_ratio
+    return output, preserve_aspect_ratio
 end
-
-
-function image_utils.loadImage(path, loadSize)
-  local loadSize = loadSize or nil
-  --local input = image.load(path)
-  local input = gm.load(path)
-  if input:dim() == 2 then
-    input = input:view(1,input:size(1), input:size(2)):repeatTensor(3,1,1)
-  elseif input:dim() == 3 and input:size(1) == 1 then
-    input = input:repeatTensor(3,1,1)
-  elseif input:dim() == 3 and input:size(1) == 3 then 
-  elseif input:dim() == 3 and input:size(1) == 4 then 
-    input = input[{{1,3},{},{}}]
-  else
-    print(#input)
-    error('loadImage: not 2-channel or 3-channel image')
-  end
-
-  if loadSize then
-    input, preserve_aspect_ratio  = image_utils.resize_crop(input, loadSize)
-  end
-
-  return input, preserve_aspect_ratio
-end
-
 
 --local load_image_inception-v3 = function(path, _input_dim, _input_sub, _input_scale)
 local load_image_inception_v3 = function(path)
@@ -151,25 +122,42 @@ local load_image_inception_v3 = function(path)
 end
 image_utils.load_image_inception_v3 = load_image_inception_v3
 
+function image_utils.loadImageWithBoundingBox(path, bbox)
+    local loadSize = loadSize or nil
+    local input = gm.load(path)
+    if input:dim() == 2 then
+        input = input:view(1,input:size(1), input:size(2)):repeatTensor(3,1,1)
+    elseif input:dim() == 3 and input:size(1) == 1 then
+        input = input:repeatTensor(3,1,1)
+    elseif input:dim() == 3 and input:size(1) == 3 then 
+    elseif input:dim() == 3 and input:size(1) == 4 then 
+        input = input[{{1,3},{},{}}]
+    else
+        print(#input)
+        error('loadImage: not 2-channel or 3-channel image')
+    end
+    input, preserve_aspect_ratio = image_utils.resize_crop(input, loadSize, aspect_ratio)
+
+    return input, preserve_aspect_ratio
+end
 
 function image_utils.loadImage(path, loadSize, aspect_ratio)
-  local loadSize = loadSize or nil
-  --local input = image.load(path)
-  local input = gm.load(path)
-  if input:dim() == 2 then
-    input = input:view(1,input:size(1), input:size(2)):repeatTensor(3,1,1)
-  elseif input:dim() == 3 and input:size(1) == 1 then
-    input = input:repeatTensor(3,1,1)
-  elseif input:dim() == 3 and input:size(1) == 3 then 
-  elseif input:dim() == 3 and input:size(1) == 4 then 
-    input = input[{{1,3},{},{}}]
-  else
-    print(#input)
-    error('loadImage: not 2-channel or 3-channel image')
-  end
-  input, preserve_aspect_ratio = image_utils.resize_crop(input, loadSize, aspect_ratio)
+    local loadSize = loadSize or nil
+    local input = gm.load(path)
+    if input:dim() == 2 then
+        input = input:view(1,input:size(1), input:size(2)):repeatTensor(3,1,1)
+    elseif input:dim() == 3 and input:size(1) == 1 then
+        input = input:repeatTensor(3,1,1)
+    elseif input:dim() == 3 and input:size(1) == 3 then 
+    elseif input:dim() == 3 and input:size(1) == 4 then 
+        input = input[{{1,3},{},{}}]
+    else
+        print(#input)
+        error('loadImage: not 2-channel or 3-channel image')
+    end
+    input, preserve_aspect_ratio = image_utils.resize_crop(input, loadSize, aspect_ratio)
 
-  return input, preserve_aspect_ratio
+    return input, preserve_aspect_ratio
 end
 
 

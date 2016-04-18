@@ -62,12 +62,7 @@ function SelectListTripletsSimple(db, size, TensorType, SampleStage)
 
         c1 = current
         local isbreak = (function() 
-            anchor_name = data.anchor_name_list[c1]
-
-            pos_of_anchor = data.positive[anchor_name]
-            if pos_of_anchor == nil then
-                return nil
-            end
+            anchor_name = data.anchor_name_list[c1].filename
             positive_name = pos_of_anchor[math.random(#pos_of_anchor)]
 
             local neg_of_anchor = data.negative[anchor_name]
@@ -319,7 +314,7 @@ function LoadData(filepath, check_imagefile)
 
     --for i=1,#label_pairs,1000 do
     for i=1,#label_pairs do
-        local isbreak = function() 
+        local isbreak = (function() 
                 m = label_pairs[i]
                 local a_name, box, properties_vector = ParsingShoes(m) 
                 if a_name == nil then
@@ -338,7 +333,7 @@ function LoadData(filepath, check_imagefile)
 
                 table.insert(anchor_name_list, {filename=a_name, box=box, properties=properties_vector})
                 return ""
-            end()
+            end)()
         if isbreak == "break" then
             break
         end
