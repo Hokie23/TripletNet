@@ -10,7 +10,10 @@ local PreProcDir = opt.preProcDir or './'
 local Whiten = opt.whiten or false
 local DataPath = opt.datapath or '/data1/fantajeon/torch/TripletNet/'
 local SimpleNormalization = (opt.normalize==1) or false
-local imagePath = opt.imagepath or '/data1/october_11st/october_11st_imgs/'
+--local imagePath = opt.imagepath or '/data1/october_11st/october_11st_imgs/'
+local imagePath = opt.imagepath or '/data2/freebee/Images/'
+
+local dbname = 'shoes'
 
 local TestData
 local TrainData
@@ -33,6 +36,7 @@ function LoadNormalizedResolutionImageCenterCrop(filename, jitter)
 end
 
 function LoadNormalizedResolutionImage(filename, jitter)
+    --print ("LoadNormalizedResolutionImage")
     return lu:LoadNormalizedResolutionImage(filename, jitter)
 end
 
@@ -222,7 +226,7 @@ end
 function SelectListTripletsSimple(db, size, TensorType, SampleStage)
     local data = db.data
     local list = {}
-    print ("generate list triplets", size, string.format("%d/%d", SampleStage.current, #data.anchor_name_list) )
+    print ("generate simple list triplets", size, string.format("%d/%d", SampleStage.current, #data.anchor_name_list) )
 
     local isend = false
     local current = SampleStage.current or 1
@@ -293,7 +297,7 @@ function GenerateListTriplets(db, size, prefix)
     local nClasses = #data.anchor_name_list 
     --for i=1, size,100 do
     for i=1, size do
-        --print ("generate list #" .. i .. "/#" .. size)
+        print ("generate list #" .. i .. "/#" .. size)
         local c1, anchor_name, positive_name, negative_name
         c1 = i
         while true do
@@ -303,6 +307,8 @@ function GenerateListTriplets(db, size, prefix)
             if pos_of_anchor ~= nil then
                 positive_name = pos_of_anchor[math.random(#pos_of_anchor)]
                 break
+            else
+                print ("pos empty", anchor_name)
             end
             c1 = math.random(nClasses)
         end
@@ -361,34 +367,37 @@ function LoadData(filepath, check_imagefile)
 
     --for i=1,#label_pairs,1000 do
     for i=1,#label_pairs do
+        --print (label_pairs)
+        --debugger.enter()
         m = label_pairs[i]
-        local a_name = m[1]
-        local t_name = m[2]
-        local p_or_n = m[3]
+        local a_name = m[2]
+        local t_name = m[3]
+        local p_or_n = m[4]
         local bcontinue = false
 
-        if a_name ~= t_name and a_name ~= nil then
-            bcontinue = false
-            if check_imagefile then
-                if ImagePoolByName[a_name] == nil then
-                    local img = LoadNormalizedResolutionImage(a_name)
-                    if isColorImage(img) then
-                        ImagePoolByName[a_name] = true
-                    else
-                        bcontinue = true
+        local cond = (function() 
+                if a_name == t_name or a_name == nil then
+                    return "error"
+                end
+                if check_imagefile then
+                    if ImagePoolByName[a_name] == nil then
+                        local img = LoadNormalizedResolutionImage(a_name)
+                        if lu.isColorImage(img) then
+                            ImagePoolByName[a_name] = true
+                        else
+                            return "error"
+                        end
+                    end
+                    if ImagePoolByName[t_name] == nil then
+                        local img = LoadNormalizedResolutionImage(t_name)
+                        if lu.isColorImage(img) then
+                            ImagePoolByName[t_name] = true
+                        else
+                            return "error"
+                        end
                     end
                 end
-                if ImagePoolByName[t_name] == nil then
-                    local img = LoadNormalizedResolutionImage(t_name)
-                    if isColorImage(img) then
-                        ImagePoolByName[t_name] = true
-                    else
-                        bcontinue = true
-                    end
-                end
-            end
 
-            if bcontinue == false then
                 if anchor_name_to_idx[a_name] == nil then
                     table.insert(anchor_name_list, a_name)
                     anchor_count = anchor_count + 1
@@ -407,11 +416,14 @@ function LoadData(filepath, check_imagefile)
                         table.insert(negative_pairs[a_name], t_name )
                     end
                 end
-            else
-                print ("continue")
-            end
+
+                return "succeeded"
+            end)()
+        if cond == "succeeded" then
+            print (i, #label_pairs, 100.0*(i/#label_pairs), "anchor", #anchor_name_list)
+        else
+            print("error", a_name)
         end
-        print (i, #label_pairs, 100.0*(i/#label_pairs), "anchor", #anchor_name_list)
     end
 
     print("loaded: " .. #anchor_name_list)
@@ -426,8 +438,9 @@ function LoadData(filepath, check_imagefile)
     return Data
 end
 
+local save_filename = PreProcDir .. '/' .. dbname .. '_save.t7' 
 function save_data()
-    torch.save(PreProcDir .. '/fashion_save.t7', 'save')
+    torch.save(save_filename, 'save')
     torch.save(PreProcDir .. '/train.resolution.t7', TrainData.Resolution)
     torch.save(PreProcDir .. '/train.data.anchor_name_list.t7', TrainData.data.anchor_name_list)
     torch.save(PreProcDir .. '/train.data.positive.t7', TrainData.data.positive)
@@ -442,7 +455,7 @@ function save_data()
 end
 
 function load_cached_data()
-    local checkfile = PreProcDir .. '/fashion_save.t7'
+    local checkfile = save_filename
     if path.exists( checkfile ) == false then
         print ( string.format("cannot find %s", checkfile) )
         return nil
@@ -490,7 +503,7 @@ function LoadNegativeData(negative_filepath)
         xlua.progress(i, #negative_list)
         neg_name = negative_list[i][1]
         local img = LoadNormalizedResolutionImage(neg_name)
-        if isColorImage(img) then
+        if lu.isColorImage(img) then
             table.insert(negative_namelist, neg_name)
         end
     end
@@ -499,8 +512,6 @@ function LoadNegativeData(negative_filepath)
     return negative_namelist
 end
 
---save_filename = PreProcDir .. '/fashion_data.t7' 
-save_filename = PreProcDir .. '/fashion_save.t7' 
 
 local NegativeList = {}
 negative_cache_filename = PreProcDir .. '/negative_list.t7'
@@ -520,8 +531,10 @@ if path.exists(save_filename) then
     RetData = load_cached_data()
     RetData.cache = true
 else
-    TrainData = LoadData('fashion_pair_train.csv', false)
-    TestData = LoadData('fashion_pair_valid.csv', false)
+    TrainData = LoadData('shoes_pair.train.csv', true)
+    TestData = LoadData('shoes_pair.valid.csv', true)
+    --TrainData = LoadData('fashion_pair_train.csv', false)
+    --TestData = LoadData('fashion_pair_valid.csv', false)
     TrainData.data.all_negative_list = NegativeList
     TestData.data.all_negative_list = NegativeList
     RetData= {TrainData=TrainData, TestData=TestData}

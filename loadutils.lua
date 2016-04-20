@@ -32,7 +32,7 @@ end
 function loadutils:LoadNormalizedResolutionImage(filename, jitter)
     for i=1,#self.defaultPathes do
         local imagepath = self.defaultPathes[i] .. filename
-        if path.exists( imagepath ) ~= false then
+        if paths.filep( imagepath ) then
             if jitter == nil then
                 return preprocess(imagepath)
             else
@@ -52,7 +52,7 @@ function loadutils:LoadNormalizedResolutionImageCenterCrop(filename)
     local output = nil
     for i=1,#self.defaultPathes do
         local imagepath = self.defaultPathes[i] .. filename
-        if path.exists( imagepath ) ~= false then
+        if paths.filep( imagepath ) then
             local ok, input = pcall(image_utils.loadImage, imagepath, self.loadSize, 1.0)
             if ok == false then
                 print ("error: 1")

@@ -44,7 +44,8 @@ cmd:option('-modelsFolder',       './Models/',            'Models Folder')
 --cmd:option('-network',            'resception_128_relu.lua',            'embedding network file - must return valid network.')
 --cmd:option('-network',            'resception_135_grid.lua',            'embedding network file - must return valid network.')
 --cmd:option('-network',            'layerdrop_135_grid.lua',            'embedding network file - must return valid network.')
-cmd:option('-network',            'attention_128_offset.lua',            'embedding network file - must return valid network.')
+--cmd:option('-network',            'attention_128_offset.lua',            'embedding network file - must return valid network.')
+cmd:option('-network',            'attention_128_grid.lua',            'embedding network file - must return valid network.')
 cmd:option('-LR',                 0.001,                    'learning rate')
 cmd:option('-LRDecay',            1e-6,                   'learning rate decay (in # samples)')
 cmd:option('-weightDecay',        1e-4,                   'L2 penalty on the weights')
@@ -67,7 +68,7 @@ cmd:option('-load',               '',                     'load existing net wei
 cmd:option('-save',               os.date():gsub(' ',''), 'save directory')
 
 cmd:text('===>Data Options')
-cmd:option('-dataset',            'fashion',              'Dataset - Cifar10 or Cifar100')
+cmd:option('-dataset',            'shoes',              'Dataset - Cifar10 or Cifar100')
 --cmd:option('-size',               640000,                 'size of training list' )
 --cmd:option('-size',               640,                 'size of training list' )
 --cmd:option('-size',               180,                 'size of training list' )
@@ -111,7 +112,8 @@ local EmbeddingNet = require(opt.network)
 --local EmbeddingWeights, EmbeddingGradients = EmbeddingNet:getParameters()
 EmbeddingNet:cuda()
 --local TripletNet = nn.TripletNet2(EmbeddingNet)
-local TripletNet = nn.TripletNet(EmbeddingNet,nn.PairwiseDistanceOffset(2) )
+--local TripletNet = nn.TripletNet(EmbeddingNet,nn.PairwiseDistanceOffset(2) )
+local TripletNet = nn.TripletNet(EmbeddingNet)
 --local Loss = nn.DistanceRatioCriterion()
 local Loss = nn.DistanceRatioCriterion()
 --local Loss = nn.TripletEmbeddingCriterion(0.2)
@@ -140,8 +142,8 @@ end
 
 --TripletNet:RebuildNet() --if using TripletNet instead of TripletNetBatch
 
---local data = require 'TripleData'
-local data = require 'TripleDataWithProperties'
+local data = require 'TripleData'
+--local data = require 'TripleDataWithProperties'
 local SizeTrain = opt.size or 640000
 --local SizeTest = SizeTrain*0.1
 local SizeTest = 6400 
@@ -249,7 +251,7 @@ local optimizer = Optimizer{
 
 -------------
 local threads = require 'threads'
-local nthread =1
+local nthread = 1
 local thread_pool = threads.Threads( nthread, function(idx)
                     require 'DataContainer'
                     require 'nn'
@@ -295,14 +297,14 @@ function Train(DataC, epoch)
 
         while true do
             --if Weights[1] ~= EmbeddingWeights[1] then
-                print (first_weight)
-                print ('original', Weights[1])
-                --local W2, G2 = TripletNet:getParameters()
-                local W2, G2 = TripletNet.nets[3]:getParameters()
-                print ('type(Weight):', Weights:type(), 'type(W2):', W2:type())
-                torch.save('tmp.t7', W2)
-                local W3 = torch.load('tmp.t7')
-                print ('after getparameters', Weights[1], W2[1], W3[1])
+--                print (first_weight)
+--                print ('original', Weights[1])
+--                --local W2, G2 = TripletNet:getParameters()
+--                local W2, G2 = TripletNet.nets[3]:getParameters()
+--                print ('type(Weight):', Weights:type(), 'type(W2):', W2:type())
+--                torch.save('tmp.t7', W2)
+--                local W3 = torch.load('tmp.t7')
+--                print ('after getparameters', Weights[1], W2[1], W3[1])
 --
 
                 --W2 = W2:float()
@@ -350,8 +352,10 @@ function Train(DataC, epoch)
                                 local ok, img = pcall(param.LoadImageFunc,filename, jitter)
                                 assert(img ~= nil)
                                 if ok == false then
-                                    print ('jitter, w1', jitter.w1, 'h1', jitter.h1, 'bFlip', jitter.bFlip, "aspect_ratio", jitter.aspect_ratio)
                                     print ("image load error", filename, "jitter", jitter)
+                                    if jitter ~= nil then
+                                        print ('jitter, w1', jitter.w1, 'h1', jitter.h1, 'bFlip', jitter.bFlip, "aspect_ratio", jitter.aspect_ratio)
+                                    end
                                     print ("error:", img)
                                     return nil
                                 end
@@ -369,6 +373,7 @@ function Train(DataC, epoch)
                         end
 
                         --local y = optimizer:optimize({x[1],x[2],x[3]})
+                        --debugger.enter()
                         local y = optimizer:optimize({x[1],x[2],x[3]}, math.sqrt(2))
                         --local y2 = EmbeddingNet:forward( x[1] )
                         --local d = (y2 - y[2]):abs():max()
