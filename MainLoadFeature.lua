@@ -14,7 +14,7 @@ local json = require('JSON.lua')
 
 local app = require('waffle')
 local async = require('async')
-local lu = loadutils('')
+local lu = loadutils({''})
 
 
 async.repl()

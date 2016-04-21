@@ -246,7 +246,7 @@ function SelectListTripletsSimple(db, size, TensorType, SampleStage)
             positive_name = pos_of_anchor[math.random(#pos_of_anchor)]
 
             local neg_of_anchor = data.negative[anchor_name]
-            if neg_of_anchor == nil or math.random(3) == 0 then
+            if neg_of_anchor == nil or math.random(2) == 1 then
                 local n1 = c1
                 local n3 = math.random( #data.all_negative_list )
                 negative_name = data.all_negative_list[n3]

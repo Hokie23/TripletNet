@@ -116,11 +116,13 @@ EmbeddingNet:cuda()
 local TripletNet = nn.TripletNet(EmbeddingNet)
 --local Loss = nn.DistanceRatioCriterion()
 local Loss = nn.DistanceRatioCriterion()
+local ErrorLoss = nn.DistanceRatioCriterion()
 --local Loss = nn.TripletEmbeddingCriterion(0.2)
 
 local Weights, Gradients = TripletNet:getParameters()
 TripletNet:cuda()
 Loss:cuda()
+ErrorLoss:cuda()
 
 
 first_weight = {Weights[1]}
@@ -220,17 +222,20 @@ local TestDataContainer = DataContainer{
 
 
 local function ErrorCount(y)
-    if torch.type(y) == 'table' then
-        y = y[#y]
-    end
+    --if torch.type(y) == 'table' then
+        --y = y[#y]
+    --end
     --return (y[{{},2}]:ge(y[{{},1}]):sum())
     -- y[{{},1}] = negative distance
     -- y[{{},2}] = positive distance
-    return (y[{{},2}]:ge(y[{{},1}]):mean())
---loss = Loss:forward(y)
+--    return (y[{{},2}]:ge(y[{{},1}]):mean())
+   -- loss = Loss:forward(y)
     --local neg_loss = -(y[1]-1.0)
     --local loss = y[2]:mean() + neg_loss:mean()
     --return loss*0.5
+
+    return ErrorLoss:forward(y,1)
+
 end
 
 local optimState = {
@@ -240,12 +245,16 @@ local optimState = {
     learningRateDecay = opt.LRDecay
 }
 
+function hookfunction(y,yt,err)
+    print ("Hook function: err", err)
+end
 
 local optimizer = Optimizer{
     Model = TripletNet,
     Loss = Loss,
     OptFunction = _G.optim[opt.optimization],
     OptState = optimState,
+    HookFunction = hookfunction,
     Parameters = {Weights, Gradients},
 }
 
@@ -374,7 +383,7 @@ function Train(DataC, epoch)
 
                         --local y = optimizer:optimize({x[1],x[2],x[3]})
                         --debugger.enter()
-                        local y = optimizer:optimize({x[1],x[2],x[3]}, math.sqrt(2))
+                        local y = optimizer:optimize({x[1],x[2],x[3]}, 1)
                         --local y2 = EmbeddingNet:forward( x[1] )
                         --local d = (y2 - y[2]):abs():max()
                         --print ("d", d)
