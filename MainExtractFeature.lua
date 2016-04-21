@@ -48,7 +48,7 @@ end
 local model = torch.load(opt.model)
 model:cuda()
 model:evaluate()
-local lu = loadutils(imagePath )
+local lu = loadutils( {imagePath} )
 
 local Resolution = lu:Resolution()
 lu:SetDefaultImagePath('') -- must be empty string because batch_list's image path is absolute.
@@ -72,36 +72,52 @@ local batch_info = {}
 local replacePath = "/data1/october_11st/october_11st_imgs/"
 for i=1,#batch_items do
     local content_id, mid_category, category_name, imagepath = unpack(batch_items[i])
-    imagepath = imagepath:gsub("/userdata2/index_11st_20151020/october_11st_imgdata/",replacePath )
-    local img = lu:LoadNormalizedResolutionImageCenterCrop(imagepath)
-
-    if img ~= nil  then
-        table.insert( batch_info, {content_id,mid_category,category_name,imagepath} )
-        current_batch = current_batch + 1
-        batch[current_batch]:copy(img)
-
-        if current_batch == batchSize then
-            batch:cuda()
-            local y = model:forward( batch )
-            current_batch = 0
-
-            for j=1,y:size(1) do
-                local feature = string.format("%f", y[j][1])
-                for yi=2,y:size(2) do
-                    feature = feature .. "," .. string.format("%f", y[j][yi])
-                end
-
-                local info = batch_info[j]
-
-                local onlyfilename = info[4]:gsub(replacePath,'')
-                output_file:write(string.format("%s\t%s\t%s\t%s\t%s\n", info[1], info[2], info[3], onlyfilename, feature ) )
+    local cond = (function() 
+            if category_name ~= 'shoes' then
+                return "stop/category"
+            end
+            imagepath = imagepath:gsub("/userdata2/index_11st_20151020/october_11st_imgdata/",replacePath )
+            local img = lu:LoadNormalizedResolutionImageCenterCrop(imagepath)
+            if img == nil then
+                return string.format("stop/image-nil(%s)", imagepath)
             end
 
-            io.flush(output_file)
-            xlua.progress(i, #batch_items)
+            table.insert( batch_info, {content_id,mid_category,category_name,imagepath} )
+            current_batch = current_batch + 1
+            batch[current_batch]:copy(img)
 
-            batch_info = {}
-        end
+            if current_batch == batchSize then
+                batch:cuda()
+                local y = model:forward( batch )
+                current_batch = 0
+
+                for j=1,y:size(1) do
+                    local feature = string.format("%f", y[j][1])
+                    for yi=2,y:size(2) do
+                        feature = feature .. "," .. string.format("%f", y[j][yi])
+                    end
+
+                    local info = batch_info[j]
+
+                    local onlyfilename = info[4]:gsub(replacePath,'')
+                    output_file:write(string.format("%s\t%s\t%s\t%s\t%s\n", info[1], info[2], info[3], onlyfilename, feature ) )
+                end
+
+                io.flush(output_file)
+                xlua.progress(i, #batch_items)
+
+                batch_info = {}
+            end
+
+            return "succeeded"
+        end)()
+
+    if cond == "break" then
+        break
+    elseif cond == "succeeded" then
+        print (imagepath, '...ok')
+    else
+        print (imagepath, '...failed', category_name, 'reason:', cond)
     end
 end
 
