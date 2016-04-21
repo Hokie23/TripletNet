@@ -13,23 +13,23 @@ end
 function DistanceRatioCriterion:createTarget(input, target)
     local target = target or 1
     self.Target:resizeAs(input):typeAs(input):zero()
-    self.Target[{{},target}]:add(sqrt(2))
+    self.Target[{{},target}]:add(math.sqrt(2))
     --debugger.enter()
     -- target means further awawy from anchor, therefor target must be 1
 end
 
-function DistanceRatioCriterion:updateOutput(input, target)
+function DistanceRatioCriterion:updateOutput(input, target_dim)
     if not self.Target:isSameSizeAs(input) then
-        self:createTarget(input, target)
+        self:createTarget(input, target_dim)
     end
     --self.output = self.MSE:updateOutput(self.SoftMax:updateOutput(input),self.Target)
     self.output = self.MSE:updateOutput(input,self.Target)
     return self.output
 end
 
-function DistanceRatioCriterion:updateGradInput(input, target)
+function DistanceRatioCriterion:updateGradInput(input, target_dim)
     if not self.Target:isSameSizeAs(input) then
-        self:createTarget(input, target)
+        self:createTarget(input, target_dim)
     end
 
     --self.gradInput = self.SoftMax:updateGradInput(input, self.MSE:updateGradInput(self.SoftMax.output,self.Target))
