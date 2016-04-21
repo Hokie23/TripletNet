@@ -51,7 +51,7 @@ model:evaluate()
 local lu = loadutils( {imagePath} )
 
 local Resolution = lu:Resolution()
-lu:SetDefaultImagePath('') -- must be empty string because batch_list's image path is absolute.
+lu:SetDefaultImagePath({''}) -- must be empty string because batch_list's image path is absolute.
 
 batch_items = csvigo.load( {path=batch_list, mode='large'} )
 local nsz = torch.LongStorage(4)
@@ -114,10 +114,10 @@ for i=1,#batch_items do
 
     if cond == "break" then
         break
-    elseif cond == "succeeded" then
-        print (imagepath, '...ok')
-    else
-        print (imagepath, '...failed', category_name, 'reason:', cond)
+    --elseif cond == "succeeded" then
+    --    print (imagepath, '...ok')
+    --else
+    --    print (imagepath, '...failed', category_name, 'reason:', cond)
     end
 end
 
