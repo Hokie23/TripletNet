@@ -306,15 +306,16 @@ function Train(DataC, epoch)
 
         while true do
             --if Weights[1] ~= EmbeddingWeights[1] then
---                print (first_weight)
---                print ('original', Weights[1])
---                --local W2, G2 = TripletNet:getParameters()
---                local W2, G2 = TripletNet.nets[3]:getParameters()
---                print ('type(Weight):', Weights:type(), 'type(W2):', W2:type())
---                torch.save('tmp.t7', W2)
---                local W3 = torch.load('tmp.t7')
---                print ('after getparameters', Weights[1], W2[1], W3[1])
---
+                --print (first_weight)
+                --print ('original', Weights[1])
+                --local W2, G2 = TripletNet:getParameters()
+                --local W2, G2 = TripletNet.nets[3]:parameters()
+                --print ('type(Weight):', Weights:type(), 'type(W2):', W2:type())
+                --print ('after Parameters', Weights[1], W2[1][1][1][1][1])
+                --torch.save('tmp.t7', W2)
+                --local W3 = torch.load('tmp.t7')
+                --print ('after getparameters', Weights[1], W2[1], W3[1])
+
 
                 --W2 = W2:float()
                 --print ('after float', Weights[1], W2[1], EmbeddingWeights[1])
@@ -502,9 +503,9 @@ while epoch ~= opt.epoch do
     EmbeddingNet:clearState()
     TripletNet:clearState()
 
-    local ew, egradp = EmbeddingNet:getParameters()
+    local ew, egradp = EmbeddingNet:parameters()
     local lightmodel = EmbeddingNet:clone('weight', 'bias', 'running_mean', 'running_std')
-    local tw, tgradp = TripletNet:getParameters()
+    local tw, tgradp = TripletNet:parameters()
 
     --optimizer.Parameters = {tw, tgradp},
 

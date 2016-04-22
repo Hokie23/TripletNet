@@ -100,6 +100,7 @@ while true do
 end
 
 print ("count:", count)
+print ("feature_pool:", feature_pool:size())
 file:close()
 
 function view(req, res)
