@@ -504,7 +504,7 @@ while epoch ~= opt.epoch do
     TripletNet:clearState()
 
     local ew, egradp = EmbeddingNet:parameters()
-    local lightmodel = EmbeddingNet:clone('weight', 'bias', 'running_mean', 'running_std')
+    local lightmodel = EmbeddingNet:clone('weight', 'bias', 'running_mean', 'running_std', 'running_var')
     local tw, tgradp = TripletNet:parameters()
 
     --optimizer.Parameters = {tw, tgradp},

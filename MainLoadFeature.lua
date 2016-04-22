@@ -161,7 +161,7 @@ function distance_from_pool(X)
     local mind = 9999
     local max_images = math.min(count, feature_pool:size(1))
     for i=1,max_images,compare_batch do
-        local bsize = math.min( feature_pool:size(1) - i, compare_batch )
+        local bsize = math.min( max_images - i, compare_batch )
         local z = feature_pool[{{i,i+bsize-1},{}}]
         if bsize ~= compare_batch then
             batchX = torch.repeatTensor(X, bsize, 1)
@@ -191,6 +191,10 @@ function distance_from_pool(X)
             table.insert(result, {rank=k,content_id=meta_pool[index].content_id, mid_category=meta_pool[index].mid_category,
                 category=meta_pool[index].category, image_url="http://10.202.35.87/october_11st/" .. meta_pool[index].imagepath, distance=bucket[k].value} )
         end
+    end
+
+    for k=1,3 do
+        print ( string.format("bucket[%d]: %d, %f", k, bucket[k].index, bucket[k].value) )
     end
     print ("end---")
 
