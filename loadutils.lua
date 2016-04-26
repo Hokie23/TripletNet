@@ -3,6 +3,7 @@ require 'image'
 require 'math'
 require 'preprocess'
 
+local debugger = require 'fb.debugger'
 local image_utils = require 'image_utils'
 
 local loadutils = torch.class("loadutils")
@@ -49,7 +50,6 @@ function loadutils.dist(a, b)
 end
 
 function loadutils:LoadNormalizedResolutionImageCenterCrop(filename)
-    local output = nil
     for i=1,#self.defaultPathes do
         local imagepath = self.defaultPathes[i] .. filename
         if paths.filep( imagepath ) then
@@ -70,10 +70,11 @@ function loadutils:LoadNormalizedResolutionImageCenterCrop(filename)
                 return nil
             end
 
-            output = preprocess_mean_std_norm(output)
+            local output = preprocess_mean_std_norm(output)
+            return output
         end
     end
-    return output
+    return nil
 end
 
 function loadutils:CheckImage(filename)

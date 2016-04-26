@@ -2,6 +2,7 @@
 require 'torch'
 require 'image'
 require 'nn'
+local debugger = require 'fb.debugger'
 local gm = require 'graphicsmagick'
 
 local image_utils = {}
@@ -122,28 +123,10 @@ local load_image_inception_v3 = function(path)
 end
 image_utils.load_image_inception_v3 = load_image_inception_v3
 
-function image_utils.loadImageWithBoundingBox(path, bbox)
-    local loadSize = loadSize or nil
-    local input = gm.load(path)
-    if input:dim() == 2 then
-        input = input:view(1,input:size(1), input:size(2)):repeatTensor(3,1,1)
-    elseif input:dim() == 3 and input:size(1) == 1 then
-        input = input:repeatTensor(3,1,1)
-    elseif input:dim() == 3 and input:size(1) == 3 then 
-    elseif input:dim() == 3 and input:size(1) == 4 then 
-        input = input[{{1,3},{},{}}]
-    else
-        print(#input)
-        error('loadImage: not 2-channel or 3-channel image')
-    end
-    input, preserve_aspect_ratio = image_utils.resize_crop(input, loadSize, aspect_ratio)
-
-    return input, preserve_aspect_ratio
-end
-
 function image_utils.loadImage(path, loadSize, aspect_ratio)
     local loadSize = loadSize or nil
     local input = gm.load(path)
+
     if input:dim() == 2 then
         input = input:view(1,input:size(1), input:size(2)):repeatTensor(3,1,1)
     elseif input:dim() == 3 and input:size(1) == 1 then

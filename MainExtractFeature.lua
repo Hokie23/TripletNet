@@ -23,6 +23,7 @@ cmd:text('==>Options')
 cmd:option('-batch_list', '/data1/october_11st/batch_list', 'batch list')
 cmd:option('-output_list', '', 'write to result')
 cmd:option('-model', '', 'model file name')
+cmd:option('-weight', '', 'weight file name')
 cmd:option('-batchSize',          32,                    'batch size')
 cmd:option('-cache', true, 'cache batch list')
 
@@ -47,6 +48,12 @@ end
 
 local model = torch.load(opt.model)
 model:cuda()
+
+if #opt.weight > 0 then
+    local weight, grad = model:getParameters()
+    local w = torch.load( opt.weight )
+    weight:copy(w)
+end
 model:evaluate()
 local lu = loadutils( {imagePath} )
 

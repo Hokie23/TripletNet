@@ -1,12 +1,19 @@
 
 local image_utils = require 'image_utils'
 
+--local cnn_model_mean =
+--  -- for inception-v3-2015-12-05, resception
+--  torch.FloatTensor{0.4853717905167, 0.45622173301884, 0.4061366788954}
+--local cnn_model_std =
+--  -- for inception-v3-2015-12-05, resception
+--  torch.FloatTensor{0.22682182875849, 0.22206057852892, 0.22145828935297}
+
 local cnn_model_mean =
   -- for inception-v3-2015-12-05, resception
-  torch.FloatTensor{0.4853717905167, 0.45622173301884, 0.4061366788954}
+  torch.FloatTensor{0.5, 0.5, 0.5}
 local cnn_model_std =
   -- for inception-v3-2015-12-05, resception
-  torch.FloatTensor{0.22682182875849, 0.22206057852892, 0.22145828935297}
+  torch.FloatTensor{0.5, 0.5, 0.5}
 
 local loadSize = {3, 342, 342}
 local sampleSize = {3, 299, 299}
