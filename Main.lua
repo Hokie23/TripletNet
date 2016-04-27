@@ -115,8 +115,8 @@ EmbeddingNet:cuda()
 --local TripletNet = nn.TripletNet(EmbeddingNet,nn.PairwiseDistanceOffset(2) )
 local TripletNet = nn.TripletNet(EmbeddingNet)
 --local Loss = nn.DistanceRatioCriterion()
-local Loss = nn.DistanceRatioCriterion(2)
-local ErrorLoss = nn.DistanceRatioCriterion(2)
+local Loss = nn.DistanceRatioCriterion(0.2)
+local ErrorLoss = nn.DistanceRatioCriterion(0.2)
 --local Loss = nn.TripletEmbeddingCriterion(0.2)
 
 local Weights, Gradients = TripletNet:getParameters()
@@ -254,7 +254,7 @@ local optimizer = Optimizer{
     Loss = Loss,
     OptFunction = _G.optim[opt.optimization],
     OptState = optimState,
-    HookFunction = hookfunction,
+    --HookFunction = hookfunction,
     Parameters = {Weights, Gradients},
 }
 
