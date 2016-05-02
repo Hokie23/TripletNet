@@ -30,7 +30,7 @@ local debugger = require( 'fb.debugger' )
 cmd = torch.CmdLine()
 cmd:addTime()
 cmd:text()
-cmd:text('Training a Triplet network on CIFAR 10/100')
+cmd:text('Training a Triplet network on Fashion Database')
 cmd:text()
 cmd:text('==>Options')
 
@@ -44,11 +44,15 @@ cmd:option('-modelsFolder',       './Models/',            'Models Folder')
 --cmd:option('-network',            'resception_128_relu.lua',            'embedding network file - must return valid network.')
 --cmd:option('-network',            'resception_135_grid.lua',            'embedding network file - must return valid network.')
 --cmd:option('-network',            'layerdrop_135_grid.lua',            'embedding network file - must return valid network.')
-cmd:option('-network',            'attention_128_offset.lua',            'embedding network file - must return valid network.')
+--cmd:option('-network',            'attention_128_offset.lua',            'embedding network file - must return valid network.')
+cmd:option('-network',            'attention_128_grid.lua',            'embedding network file - must return valid network.')
 cmd:option('-LR',                 0.001,                    'learning rate')
 cmd:option('-LRDecay',            1e-6,                   'learning rate decay (in # samples)')
 cmd:option('-weightDecay',        1e-4,                   'L2 penalty on the weights')
 cmd:option('-momentum',           0.95,                    'momentum')
+cmd:option('-distance_ratio',           0.01,                    'distance ratio')
+cmd:option('-max_distance_ratio',           1.0,                    'distance ratio')
+cmd:option('-distance_increment',           0.05,                    'distance increment')
 -- cmd:option('-batchSize',          128,                    'batch size')
 -- cmd:option('-batchSize',          1,                    'batch size')
 --cmd:option('-batchSize',          8,                    'batch size')
@@ -85,6 +89,9 @@ cmd:option('-visualize',          true,                  'display first level fi
 
 
 opt = cmd:parse(arg or {})
+distance_ratio = opt.distance_ratio
+max_distance_ratio = opt.max_distance_ratio
+distance_increment = opt.distance_increment
 torch.setdefaulttensortype('torch.FloatTensor')
 torch.setnumthreads(opt.threads)
 cutorch.setDevice(opt.devid)
@@ -111,14 +118,18 @@ local EmbeddingNet = require(opt.network)
 --local EmbeddingWeights, EmbeddingGradients = EmbeddingNet:getParameters()
 EmbeddingNet:cuda()
 --local TripletNet = nn.TripletNet2(EmbeddingNet)
-local TripletNet = nn.TripletNet(EmbeddingNet,nn.PairwiseDistanceOffset(2) )
+--local TripletNet = nn.TripletNet(EmbeddingNet,nn.PairwiseDistanceOffset(2) )
+local TripletNet = nn.TripletNet(EmbeddingNet)
 --local Loss = nn.DistanceRatioCriterion()
-local Loss = nn.DistanceRatioCriterion()
+
+local Loss = nn.DistanceRatioCriterion(distance_ratio)
+local ErrorLoss = nn.DistanceRatioCriterion(distance_ratio)
 --local Loss = nn.TripletEmbeddingCriterion(0.2)
 
 local Weights, Gradients = TripletNet:getParameters()
 TripletNet:cuda()
 Loss:cuda()
+ErrorLoss:cuda()
 
 
 first_weight = {Weights[1]}
@@ -140,8 +151,8 @@ end
 
 --TripletNet:RebuildNet() --if using TripletNet instead of TripletNetBatch
 
---local data = require 'TripleData'
-local data = require 'TripleShoesData'
+local data = require 'TripleData'
+--local data = require 'TripleDataWithProperties'
 local SizeTrain = opt.size or 640000
 --local SizeTest = SizeTrain*0.1
 local SizeTest = 6400 
@@ -218,17 +229,20 @@ local TestDataContainer = DataContainer{
 
 
 local function ErrorCount(y)
-    if torch.type(y) == 'table' then
-        y = y[#y]
-    end
+    --if torch.type(y) == 'table' then
+        --y = y[#y]
+    --end
     --return (y[{{},2}]:ge(y[{{},1}]):sum())
     -- y[{{},1}] = negative distance
     -- y[{{},2}] = positive distance
-    return (y[{{},2}]:ge(y[{{},1}]):mean())
---loss = Loss:forward(y)
+--    return (y[{{},2}]:ge(y[{{},1}]):mean())
+   -- loss = Loss:forward(y)
     --local neg_loss = -(y[1]-1.0)
     --local loss = y[2]:mean() + neg_loss:mean()
     --return loss*0.5
+
+    return ErrorLoss:forward(y,1)
+
 end
 
 local optimState = {
@@ -238,18 +252,22 @@ local optimState = {
     learningRateDecay = opt.LRDecay
 }
 
+function hookfunction(y,yt,err)
+    print ("Hook function: err", err)
+end
 
 local optimizer = Optimizer{
     Model = TripletNet,
     Loss = Loss,
     OptFunction = _G.optim[opt.optimization],
     OptState = optimState,
+    --HookFunction = hookfunction,
     Parameters = {Weights, Gradients},
 }
 
 -------------
 local threads = require 'threads'
-local nthread =1
+local nthread = 1
 local thread_pool = threads.Threads( nthread, function(idx)
                     require 'DataContainer'
                     require 'nn'
@@ -294,30 +312,6 @@ function Train(DataC, epoch)
         TripletNet:training()
 
         while true do
-            --if Weights[1] ~= EmbeddingWeights[1] then
-                print (first_weight)
-                print ('original', Weights[1])
-                --local W2, G2 = TripletNet:getParameters()
-                local W2, G2 = TripletNet.nets[3]:getParameters()
-                print ('type(Weight):', Weights:type(), 'type(W2):', W2:type())
-                torch.save('tmp.t7', W2)
-                local W3 = torch.load('tmp.t7')
-                print ('after getparameters', Weights[1], W2[1], W3[1])
---
-
-                --W2 = W2:float()
-                --print ('after float', Weights[1], W2[1], EmbeddingWeights[1])
-                --local w = Weights:float()
-                --print ('type(Weight):', w:type(), 'type(W2):', W2:type())
-                --print ('after Weights float', w[1], W2[1], EmbeddingWeights[1])
-                --print ('optimization', optimizer.Parameters[1][1])
-                --TripletNet:cuda()
-                --Weights:cuda()
---
---                debugger.enter()
---
-                --error('miss matched')
-            --end
             collectgarbage()
             local mylist = DataC:GetNextBatch()
             if mylist == nil then
@@ -350,8 +344,10 @@ function Train(DataC, epoch)
                                 local ok, img = pcall(param.LoadImageFunc,filename, jitter)
                                 assert(img ~= nil)
                                 if ok == false then
-                                    print ('jitter, w1', jitter.w1, 'h1', jitter.h1, 'bFlip', jitter.bFlip, "aspect_ratio", jitter.aspect_ratio)
                                     print ("image load error", filename, "jitter", jitter)
+                                    if jitter ~= nil then
+                                        print ('jitter, w1', jitter.w1, 'h1', jitter.h1, 'bFlip', jitter.bFlip, "aspect_ratio", jitter.aspect_ratio)
+                                    end
                                     print ("error:", img)
                                     return nil
                                 end
@@ -369,7 +365,8 @@ function Train(DataC, epoch)
                         end
 
                         --local y = optimizer:optimize({x[1],x[2],x[3]})
-                        local y = optimizer:optimize({x[1],x[2],x[3]}, math.sqrt(2))
+                        --debugger.enter()
+                        local y = optimizer:optimize({x[1],x[2],x[3]}, 1)
                         --local y2 = EmbeddingNet:forward( x[1] )
                         --local d = (y2 - y[2]):abs():max()
                         --print ("d", d)
@@ -488,9 +485,9 @@ while epoch ~= opt.epoch do
     EmbeddingNet:clearState()
     TripletNet:clearState()
 
-    local ew, egradp = EmbeddingNet:getParameters()
-    local lightmodel = EmbeddingNet:clone('weight', 'bias', 'running_mean', 'running_std')
-    local tw, tgradp = TripletNet:getParameters()
+    local ew, egradp = EmbeddingNet:parameters()
+    local lightmodel = EmbeddingNet:clone('weight', 'bias', 'running_mean', 'running_std', 'running_var')
+    local tw, tgradp = TripletNet:parameters()
 
     --optimizer.Parameters = {tw, tgradp},
 
@@ -524,7 +521,16 @@ while epoch ~= opt.epoch do
         image.saveJPG(paths.concat(opt.save,'Filters_epoch'.. epoch .. '.jpg'), image.toDisplayTensor(weights))
     end
 
+
     epoch = epoch+1
+    if epoch % 5 == 0 then
+        distance_ratio = distance_ratio + distance_increment
+        if distance_ratio > max_distance_ratio then
+            distance_ratio = max_distance_ratio
+        end
+        Loss:Reset(distance_ratio)
+        ErrorLoss:Reset(distance_ratio)
+    end
 end
 
 print ("End Training\n")
