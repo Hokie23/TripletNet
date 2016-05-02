@@ -11,7 +11,7 @@ model.modules[#model.modules] = nil
 model.modules[#model.modules] = nil
 
 addAttentionLSTM(model, 0.9, 2048, 128, 128, 'L1')
---model:add( nn.ReLU(true) )
+model:add( nn.ReLU(true) )
 model:add( nn.Normalize(2) )
 
 return model

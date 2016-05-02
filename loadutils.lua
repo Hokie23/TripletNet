@@ -89,11 +89,12 @@ function loadutils:CheckImage(filename)
 end
 
 
-function loadutils:LoadPairs(filepath, check_imagefile)
+function loadutils:LoadPairs(filepath, check_imagefile, first_index)
     label_pairs = csvigo.load( {path=filepath, mode='large'} )
     local check_image = check_imagefile or false
     local output_pairs = {}
     local imagepoolbyname = {}
+    local first_index = first_index or 1
 
     for i=1,#label_pairs do
         m = label_pairs[i]

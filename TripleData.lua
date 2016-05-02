@@ -5,15 +5,23 @@ require 'loadutils'
 
 local debugger = require('fb.debugger')
 
+--local dbname = 'shoes'
+local dbname = 'fashion'
 local opt = opt or {}
 local PreProcDir = opt.preProcDir or './'
 local Whiten = opt.whiten or false
 local DataPath = opt.datapath or '/data1/fantajeon/torch/TripletNet/'
 local SimpleNormalization = (opt.normalize==1) or false
---local imagePath = opt.imagepath or '/data1/october_11st/october_11st_imgs/'
-local imagePath = opt.imagepath or '/data2/freebee/Images/'
+local imagepath = nil
+assert(dbname~= nil, 'dbname required')
+if dbname == 'fashion' then
+    imagePath = opt.imagepath or '/data1/october_11st/october_11st_imgs/'
+elseif dbname == 'shoes' then
+    imagePath = opt.imagepath or '/data2/freebee/Images/'
+end
 
-local dbname = 'shoes'
+assert(imagePath~= nil, 'imaegPath is empty')
+
 
 local TestData
 local TrainData
@@ -351,7 +359,93 @@ function countTableSize(table)
     return n
 end
 
-function LoadData(filepath, check_imagefile)
+function LoadDataFashion(filepath, check_imagefile)
+    local Data = {data={},imagepool={}}
+    local positive_pairs = {}
+    local negative_pairs = {}
+    local anchor_name_to_idx = {}
+    local anchor_name_list = {}
+    local anchor_count = 0
+    local ImagePool = {}
+    local count_imagepool = 0
+    local ImagePoolByName = {}
+    local check_imagefile = check_imagefile or false
+
+    label_pairs = csvigo.load( {path=DataPath .. filepath, mode='large'} )
+
+    --for i=1,#label_pairs,1000 do
+    for i=1,#label_pairs do
+        --print (label_pairs)
+        --debugger.enter()
+        m = label_pairs[i]
+        local a_name = m[1]
+        local t_name = m[2]
+        local p_or_n = m[3]
+        local bcontinue = false
+
+        local cond = (function() 
+                if a_name == t_name or a_name == nil then
+                    return "error"
+                end
+                if check_imagefile then
+                    if ImagePoolByName[a_name] == nil then
+                        local img = LoadNormalizedResolutionImage(a_name)
+                        if lu.isColorImage(img) then
+                            ImagePoolByName[a_name] = true
+                        else
+                            return "error"
+                        end
+                    end
+                    if ImagePoolByName[t_name] == nil then
+                        local img = LoadNormalizedResolutionImage(t_name)
+                        if lu.isColorImage(img) then
+                            ImagePoolByName[t_name] = true
+                        else
+                            return "error"
+                        end
+                    end
+                end
+
+                if anchor_name_to_idx[a_name] == nil then
+                    table.insert(anchor_name_list, a_name)
+                    anchor_count = anchor_count + 1
+                    anchor_name_to_idx[a_name] = anchor_count
+                end
+                if p_or_n == '1' then
+                    if positive_pairs[a_name] == nil then
+                        positive_pairs[a_name] = {t_name}
+                    else
+                        table.insert(positive_pairs[a_name], t_name )
+                    end
+                else 
+                    if negative_pairs[a_name] == nil then
+                        negative_pairs[a_name] = {t_name}
+                    else
+                        table.insert(negative_pairs[a_name], t_name )
+                    end
+                end
+
+                return "succeeded"
+            end)()
+        if cond == "succeeded" then
+            print (i, #label_pairs, 100.0*(i/#label_pairs), "anchor", #anchor_name_list)
+        else
+            print("error", a_name)
+        end
+    end
+
+    print("loaded: " .. #anchor_name_list)
+    print("loaded imagepool: " .. #ImagePool)
+    Data.data.anchor_name_list = anchor_name_list
+    Data.data.positive = positive_pairs
+    Data.data.negative = negative_pairs
+    Data.Resolution = {3,299,299}
+
+    print ("Data Size:", #Data.data.anchor_name_list)
+
+    return Data
+end
+function LoadDataShoes(filepath, check_imagefile)
     local Data = {data={},imagepool={}}
     local positive_pairs = {}
     local negative_pairs = {}
@@ -531,10 +625,13 @@ if path.exists(save_filename) then
     RetData = load_cached_data()
     RetData.cache = true
 else
-    TrainData = LoadData('shoes_pair.train.csv', true)
-    TestData = LoadData('shoes_pair.valid.csv', true)
-    --TrainData = LoadData('fashion_pair_train.csv', false)
-    --TestData = LoadData('fashion_pair_valid.csv', false)
+    if dbname == 'shoes' then
+        TrainData = LoadDataShoes('shoes_pair.train.csv', true)
+        TestData = LoadDataShoes('shoes_pair.valid.csv', true)
+    elseif dbname == 'fashion' then
+        TrainData = LoadDataFashion('fashion_pair_train.csv', false)
+        TestData = LoadDataFashion('fashion_pair_valid.csv', false)
+    end
     TrainData.data.all_negative_list = NegativeList
     TestData.data.all_negative_list = NegativeList
     RetData= {TrainData=TrainData, TestData=TestData}

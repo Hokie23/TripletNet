@@ -115,8 +115,9 @@ EmbeddingNet:cuda()
 --local TripletNet = nn.TripletNet(EmbeddingNet,nn.PairwiseDistanceOffset(2) )
 local TripletNet = nn.TripletNet(EmbeddingNet)
 --local Loss = nn.DistanceRatioCriterion()
-local Loss = nn.DistanceRatioCriterion(0.2)
-local ErrorLoss = nn.DistanceRatioCriterion(0.2)
+
+local Loss = nn.DistanceRatioCriterion(0.02)
+local ErrorLoss = nn.DistanceRatioCriterion(0.02)
 --local Loss = nn.TripletEmbeddingCriterion(0.2)
 
 local Weights, Gradients = TripletNet:getParameters()

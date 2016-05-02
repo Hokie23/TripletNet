@@ -64,7 +64,7 @@ opt.network = opt.modelsFolder .. opt.network
 opt.save = paths.concat('./StaticsResults', opt.save)
 output_filename = opt.output
 
-lu = loadutils(opt.imagePath)
+lu = loadutils({opt.imagePath})
 
 ----------------------------------------------------------------------
 -- Model + Loss:

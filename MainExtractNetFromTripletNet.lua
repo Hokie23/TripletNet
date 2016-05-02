@@ -2,8 +2,8 @@ require 'TripletNet'
 require 'AttentionLSTM'
 
 
-network_file = './Results/TueApr2620:13:122016/Embedding.t7best.tripletnet.t7'
-output_file = './Results/TueApr2620:13:122016/tripletnet.best.t7'
+network_file = './Results/WedApr2714:53:202016/Embedding.t7best.tripletnet.t7'
+output_file = './Results/WedApr2714:53:202016/tripletnet.best.t7'
 --weight_file = './Results/FriApr2214:13:112016/Weights.t7optim.w.t723'
 n = torch.load(network_file)
 

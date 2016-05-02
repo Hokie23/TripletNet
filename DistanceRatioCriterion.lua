@@ -3,7 +3,7 @@ local debugger = require('fb.debugger')
 
 local DistanceRatioCriterion, parent = torch.class('nn.DistanceRatioCriterion', 'nn.Criterion')
 
--- I suggest max_value must be small(0.2), do not extreme value ie, 1.0, sqrt(2), 2. 
+-- I suggest max_value must be small(0.02~0.2), do not extreme value ie, 1.0, sqrt(2), 2. 
 -- the extreme value cause overfitting
 -- I guess the 128D normal volume space is too small to embed the high-dimensional feature vector 
 function DistanceRatioCriterion:__init(max_value)
