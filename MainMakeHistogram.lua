@@ -95,9 +95,10 @@ for i=1,#projectlist do
     local legend = projectlist[i].legend or projectlist[i].project
     local linestyle = projectlist[i].linestyle
 
-    local rec, prec, ap, sortind = precisionrecall(conf, label, 0, 0.001)
-    print ("ap", ap)
-    --local rec, prec = precision_recall(conf, label)
+    --local rec, prec, ap, sortind = precisionrecall(conf, label, 0, 0.001)
+    --print ("ap-1", ap)
+    local rec, prec, ap, threshold1 = precision_recall(conf, label)
+    print ("ap-2", ap)
 
     local roc_points, threshold = metrics.roc.points(conf, label)
     print (rec:type(), roc_points:type())
