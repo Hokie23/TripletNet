@@ -30,7 +30,7 @@ local debugger = require( 'fb.debugger' )
 cmd = torch.CmdLine()
 cmd:addTime()
 cmd:text()
-cmd:text('Training a Triplet network on CIFAR 10/100')
+cmd:text('Training a Triplet network on Fashion Database')
 cmd:text()
 cmd:text('==>Options')
 
@@ -50,6 +50,9 @@ cmd:option('-LR',                 0.001,                    'learning rate')
 cmd:option('-LRDecay',            1e-6,                   'learning rate decay (in # samples)')
 cmd:option('-weightDecay',        1e-4,                   'L2 penalty on the weights')
 cmd:option('-momentum',           0.95,                    'momentum')
+cmd:option('-distance_ratio',           0.01,                    'distance ratio')
+cmd:option('-max_distance_ratio',           1.0,                    'distance ratio')
+cmd:option('-distance_increment',           0.05,                    'distance increment')
 -- cmd:option('-batchSize',          128,                    'batch size')
 -- cmd:option('-batchSize',          1,                    'batch size')
 --cmd:option('-batchSize',          8,                    'batch size')
@@ -68,7 +71,7 @@ cmd:option('-load',               '',                     'load existing net wei
 cmd:option('-save',               os.date():gsub(' ',''), 'save directory')
 
 cmd:text('===>Data Options')
-cmd:option('-dataset',            'shoes',              'Dataset - Cifar10 or Cifar100')
+cmd:option('-dataset',            'fashion',              'Dataset - Cifar10 or Cifar100')
 --cmd:option('-size',               640000,                 'size of training list' )
 --cmd:option('-size',               640,                 'size of training list' )
 --cmd:option('-size',               180,                 'size of training list' )
@@ -86,6 +89,9 @@ cmd:option('-visualize',          true,                  'display first level fi
 
 
 opt = cmd:parse(arg or {})
+distance_ratio = opt.distance_ratio
+max_distance_ratio = opt.max_distance_ratio
+distance_increment = opt.distance_increment
 torch.setdefaulttensortype('torch.FloatTensor')
 torch.setnumthreads(opt.threads)
 cutorch.setDevice(opt.devid)
@@ -116,8 +122,8 @@ EmbeddingNet:cuda()
 local TripletNet = nn.TripletNet(EmbeddingNet)
 --local Loss = nn.DistanceRatioCriterion()
 
-local Loss = nn.DistanceRatioCriterion(0.02)
-local ErrorLoss = nn.DistanceRatioCriterion(0.02)
+local Loss = nn.DistanceRatioCriterion(distance_ratio)
+local ErrorLoss = nn.DistanceRatioCriterion(distance_ratio)
 --local Loss = nn.TripletEmbeddingCriterion(0.2)
 
 local Weights, Gradients = TripletNet:getParameters()
@@ -306,31 +312,6 @@ function Train(DataC, epoch)
         TripletNet:training()
 
         while true do
-            --if Weights[1] ~= EmbeddingWeights[1] then
-                --print (first_weight)
-                --print ('original', Weights[1])
-                --local W2, G2 = TripletNet:getParameters()
-                --local W2, G2 = TripletNet.nets[3]:parameters()
-                --print ('type(Weight):', Weights:type(), 'type(W2):', W2:type())
-                --print ('after Parameters', Weights[1], W2[1][1][1][1][1])
-                --torch.save('tmp.t7', W2)
-                --local W3 = torch.load('tmp.t7')
-                --print ('after getparameters', Weights[1], W2[1], W3[1])
-
-
-                --W2 = W2:float()
-                --print ('after float', Weights[1], W2[1], EmbeddingWeights[1])
-                --local w = Weights:float()
-                --print ('type(Weight):', w:type(), 'type(W2):', W2:type())
-                --print ('after Weights float', w[1], W2[1], EmbeddingWeights[1])
-                --print ('optimization', optimizer.Parameters[1][1])
-                --TripletNet:cuda()
-                --Weights:cuda()
---
---                debugger.enter()
---
-                --error('miss matched')
-            --end
             collectgarbage()
             local mylist = DataC:GetNextBatch()
             if mylist == nil then
@@ -540,7 +521,16 @@ while epoch ~= opt.epoch do
         image.saveJPG(paths.concat(opt.save,'Filters_epoch'.. epoch .. '.jpg'), image.toDisplayTensor(weights))
     end
 
+
     epoch = epoch+1
+    if epoch % 5 == 0 then
+        distance_ratio = distance_ratio + distance_increment
+        if distance_ratio > max_distance_ratio then
+            distance_ratio = max_distance_ratio
+        end
+        Loss:Reset(distance_ratio)
+        ErrorLoss:Reset(distance_ratio)
+    end
 end
 
 print ("End Training\n")

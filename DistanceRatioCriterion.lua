@@ -14,10 +14,15 @@ function DistanceRatioCriterion:__init(max_value)
     self.MaxTargetValue = max_value or math.sqrt(2)
 end
 
+function DistanceRatioCriterion:ResetTargetValue(max_value)
+    self.MaxTargetValue = max_value
+    self.Target[{{},target}] = self.MaxTargetValue
+end
+
 function DistanceRatioCriterion:createTarget(input, target)
     local target = target or 1
     self.Target:resizeAs(input):typeAs(input):zero()
-    self.Target[{{},target}]:add(self.MaxTargetValue)
+    self.Target[{{},target}] = self.MaxTargetValue
     --debugger.enter()
     -- target means further awawy from anchor, therefor target must be 1
 end
