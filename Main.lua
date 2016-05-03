@@ -50,9 +50,9 @@ cmd:option('-LR',                 0.001,                    'learning rate')
 cmd:option('-LRDecay',            1e-6,                   'learning rate decay (in # samples)')
 cmd:option('-weightDecay',        1e-4,                   'L2 penalty on the weights')
 cmd:option('-momentum',           0.95,                    'momentum')
-cmd:option('-distance_ratio',           0.01,                    'distance ratio')
+cmd:option('-distance_ratio',           0.05,                    'distance ratio')
 cmd:option('-max_distance_ratio',           1.0,                    'distance ratio')
-cmd:option('-distance_increment',           0.05,                    'distance increment')
+cmd:option('-distance_increment',           0.001,                    'distance increment')
 -- cmd:option('-batchSize',          128,                    'batch size')
 -- cmd:option('-batchSize',          1,                    'batch size')
 --cmd:option('-batchSize',          8,                    'batch size')
@@ -377,7 +377,7 @@ function Train(DataC, epoch)
                         --print("y:", y)
 
                         -- print( "lerr: ", lerr*100.0/y[1]:size(1) )
-                        print( string.format("[epoch #%d]: Train lerr: %e", epoch, lerr ) )
+                        print( string.format("[epoch:%d, mdist=%f]: Train lerr: %e", epoch, distance_ratio, lerr ) )
 
                         err = err + lerr
                         xlua.progress(num*DataC.BatchSize, TrainSampleStage.total_size )
@@ -456,7 +456,7 @@ function Test(DataC, epoch)
                     local y = TripletNet:forward({x[1],x[2],x[3]})
                     local lerr = ErrorCount(y)
                     --print( "Test lerr: ", lerr*100.0/y[1]:size(1) )
-                    print( string.format("[epoch:%d]: Test lerr: %e", epoch, lerr ) )
+                    print( string.format("[epoch:%d, mdist=%f]: Test lerr: %e", epoch, distance_ratio, lerr ) )
                     err = err + lerr
                     xlua.progress(num*DataC.BatchSize, DataC:size())
                     num = num +1
@@ -496,7 +496,7 @@ while epoch ~= opt.epoch do
     torch.save(weights_filename .. 'optim.w.t7' .. epoch, optimizer.Parameters[1])
     --torch.save(weights_filename .. epoch, tw)
     --torch.save(weights_filename .. 'tripletnet.t7' .. epoch, TripletNet)
-    print( string.format('[epoch #%d] Training Error = %f', epoch,  ErrTrain) )
+    print( string.format('[epoch #%d]:%s Training Error = %f', epoch, opt.save, ErrTrain) )
     local ErrTest = Test(TestDataContainer, epoch)
     if bestErr > ErrTest then
         print ("Save Best")
@@ -523,14 +523,12 @@ while epoch ~= opt.epoch do
 
 
     epoch = epoch+1
-    if epoch % 5 == 0 then
-        distance_ratio = distance_ratio + distance_increment
-        if distance_ratio > max_distance_ratio then
-            distance_ratio = max_distance_ratio
-        end
-        Loss:Reset(distance_ratio)
-        ErrorLoss:Reset(distance_ratio)
+    distance_ratio = distance_ratio + distance_increment*(max_distance_ratio - distance_ratio)
+    if distance_ratio > max_distance_ratio then
+        distance_ratio = max_distance_ratio
     end
+    Loss:ResetTargetValue(distance_ratio)
+    ErrorLoss:ResetTargetValue(distance_ratio)
 end
 
 print ("End Training\n")
