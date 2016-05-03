@@ -377,7 +377,7 @@ function Train(DataC, epoch)
                         --print("y:", y)
 
                         -- print( "lerr: ", lerr*100.0/y[1]:size(1) )
-                        print( string.format("[epoch:%d, mdist=%f]: Train lerr: %e", epoch, distance_ratio, lerr ) )
+                        print( string.format("[epoch:%d, mdist=%f]: Train lerr: %e(%e)", epoch, distance_ratio, lerr, lerr/distance_ratio ) )
 
                         err = err + lerr
                         xlua.progress(num*DataC.BatchSize, TrainSampleStage.total_size )
@@ -456,7 +456,7 @@ function Test(DataC, epoch)
                     local y = TripletNet:forward({x[1],x[2],x[3]})
                     local lerr = ErrorCount(y)
                     --print( "Test lerr: ", lerr*100.0/y[1]:size(1) )
-                    print( string.format("[epoch:%d, mdist=%f]: Test lerr: %e", epoch, distance_ratio, lerr ) )
+                    print( string.format("[epoch:%d, mdist=%f]: Test lerr: %e(%e)", epoch, distance_ratio, lerr, lerr/distance_ratio ) )
                     err = err + lerr
                     xlua.progress(num*DataC.BatchSize, DataC:size())
                     num = num +1
@@ -496,7 +496,7 @@ while epoch ~= opt.epoch do
     torch.save(weights_filename .. 'optim.w.t7' .. epoch, optimizer.Parameters[1])
     --torch.save(weights_filename .. epoch, tw)
     --torch.save(weights_filename .. 'tripletnet.t7' .. epoch, TripletNet)
-    print( string.format('[epoch #%d]:%s Training Error = %f', epoch, opt.save, ErrTrain) )
+    print( string.format('[epoch #%d:%f]:%s Training Error = %f(%f)', epoch, distance_ratio, opt.save, ErrTrain, ErrTrain/distance_ratio) )
     local ErrTest = Test(TestDataContainer, epoch)
     if bestErr > ErrTest then
         print ("Save Best")
@@ -508,7 +508,7 @@ while epoch ~= opt.epoch do
         torch.save(weights_filename .. 'best.optim.w.t7', optimizer.Parameters[1])
     end
 
-    print( string.format('[epoch #%d] Test Error = %f', epoch, ErrTest) )
+    print( string.format('[epoch #%d:%f] Test Error = %f(%f)', epoch, distance_ratio, ErrTest, ErrTest/distance_ratio) )
     Log:add{['Training Error']= ErrTrain* 100, ['Test Error'] = ErrTest* 100}
     Log:style{['Training Error'] = '-', ['Test Error'] = '-'}
     Log:plot()
