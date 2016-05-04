@@ -217,7 +217,7 @@ function SelectListTriplets(embedding_net, db, size, TensorType, SampleStage)
             print ("exemplar", exemplar)
         end
 
-        --current = current + 1000
+        --current = current + 100
         current = current + 1
         if current > #data.anchor_name_list then
             isend = true
@@ -284,8 +284,8 @@ function SelectListTripletsSimple(db, size, TensorType, SampleStage)
             break
         end
 
-        current = current + 1
-        --current = current + 1000
+        --current = current + 1
+        current = current + 5
         if current > #data.anchor_name_list then
             isend = true
             current = 1
@@ -298,13 +298,13 @@ function SelectListTripletsSimple(db, size, TensorType, SampleStage)
 end
 
 
-function GenerateListTriplets(db, size, prefix)
+function GenerateListTriplets(db, size, prefix, SampleStage)
     print ("generate list triplets", size)
     local data = db.data
     local list = {}
     local nClasses = #data.anchor_name_list 
-    --for i=1, size,100 do
-    for i=1, size do
+    for i=1, size, 5 do
+    --for i=1, size do
         print ("generate list #" .. i .. "/#" .. size)
         local c1, anchor_name, positive_name, negative_name
         c1 = i

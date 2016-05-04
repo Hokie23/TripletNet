@@ -380,7 +380,7 @@ function Train(DataC, epoch)
                         print( string.format("[epoch:%d, mdist=%f]: Train lerr: %e(%e)", epoch, distance_ratio, lerr, lerr/distance_ratio ) )
 
                         err = err + lerr
-                        xlua.progress(num*DataC.BatchSize, TrainSampleStage.total_size )
+                        xlua.progress(TrainSampleStage.current, TrainSampleStage.total_size )
                         num = num + 1
                     end,
                     jobparam 
@@ -475,6 +475,7 @@ end
 
 print ("-----436")
 local bestErr = 10000
+local bestTrainErr = 10000
 local epoch = 1
 print '\n==> Starting Training\n'
 while epoch ~= opt.epoch do
@@ -485,14 +486,12 @@ while epoch ~= opt.epoch do
     EmbeddingNet:clearState()
     TripletNet:clearState()
 
-    local ew, egradp = EmbeddingNet:parameters()
-    local lightmodel = EmbeddingNet:clone('weight', 'bias', 'running_mean', 'running_std', 'running_var')
+    local lightmodel = TripletNet.nets[1]:clone('weight', 'bias', 'running_mean', 'running_std', 'running_var')
     local tw, tgradp = TripletNet:parameters()
 
     --optimizer.Parameters = {tw, tgradp},
 
-    torch.save(network_filename .. epoch, lightmodel)
-    torch.save(weights_filename .. 'embedding.t7' .. epoch, ew)
+    torch.save(network_filename .. 'tripletnet.t7' .. epoch, lightmodel)
     torch.save(weights_filename .. 'optim.w.t7' .. epoch, optimizer.Parameters[1])
     --torch.save(weights_filename .. epoch, tw)
     --torch.save(weights_filename .. 'tripletnet.t7' .. epoch, TripletNet)
@@ -502,7 +501,6 @@ while epoch ~= opt.epoch do
         print ("Save Best")
         bestErr = ErrTest
         torch.save(network_filename .. 'best.embedding.model.t7', lightmodel)
-        torch.save(weights_filename .. 'best.embedding.w.t7', ew)
         torch.save(network_filename .. 'best.tripletnet.t7', TripletNet)
         torch.save(weights_filename .. 'best.tripletnet.w.t7', tw)
         torch.save(weights_filename .. 'best.optim.w.t7', optimizer.Parameters[1])
@@ -523,12 +521,15 @@ while epoch ~= opt.epoch do
 
 
     epoch = epoch+1
-    distance_ratio = distance_ratio + distance_increment*(max_distance_ratio - distance_ratio)
-    if distance_ratio > max_distance_ratio then
-        distance_ratio = max_distance_ratio
+    if bestTrainErr > ErrTrain then
+        bestTrainErr = ErrTrain
+        distance_ratio = distance_ratio + distance_increment*(max_distance_ratio - distance_ratio)
+        if distance_ratio > max_distance_ratio then
+            distance_ratio = max_distance_ratio
+        end
+        Loss:ResetTargetValue(distance_ratio)
+        ErrorLoss:ResetTargetValue(distance_ratio)
     end
-    Loss:ResetTargetValue(distance_ratio)
-    ErrorLoss:ResetTargetValue(distance_ratio)
 end
 
 print ("End Training\n")
