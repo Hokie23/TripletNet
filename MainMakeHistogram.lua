@@ -14,6 +14,8 @@ projectlist = { {project='distance_pair_128_att_0411', linestyle='-'},
         {project='distance_pair_128_att_valid', linestyle='-'}, 
         {project='distance_pair_128_0502', linestyle='-'},
         {project='distance_pair_128_0428', linestyle='-'},
+        {project='distance_pair_128_0508', linestyle='-'},
+        {project='distance_pair_128_0508_forceince', linestyle='-'},
         {project='distance_pair_1024', linestyle='-'}
     }
 
@@ -170,3 +172,5 @@ gnuplot.xlabel('false positive rate')
 gnuplot.ylabel('true positive rate')
 gnuplot.title('Receiver operating characteristic')
 gnuplot.plotflush()
+
+os.exit(0)

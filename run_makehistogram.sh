@@ -1,5 +1,11 @@
 #!/bin/bash
 
+#run_statics_gpu3.sh
+#cal_ret=$?
+#if [$cal_ret -ne 0]; then
+#    echo 'failed to make histogram files'
+#    exit 1
+#fi
 CUDA_VISIBLE_DEVICES=0 th MainMakeHistogram.lua 
 
 #CUDA_VISIBLE_DEVICES=0 th MainMakeHistogram.lua -project distance_pair
@@ -22,3 +28,11 @@ CUDA_VISIBLE_DEVICES=0 th MainMakeHistogram.lua
 #CUDA_VISIBLE_DEVICES=0 th MainMakeHistogram.lua -project distance_pair_512_a
 #CUDA_VISIBLE_DEVICES=0 th MainMakeHistogram.lua -project distance_pair_128
 #CUDA_VISIBLE_DEVICES=0 th MainMakeHistogram.lua -project distance_pair_1024
+
+
+if [$? -ne 0]; then
+    echo 'Failed to make histogram'
+    exit 2
+fi
+echo 'Congratulation! Finished making histogram'
+exit 0

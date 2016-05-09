@@ -50,9 +50,12 @@ cmd:option('-LR',                 0.001,                    'learning rate')
 cmd:option('-LRDecay',            1e-6,                   'learning rate decay (in # samples)')
 cmd:option('-weightDecay',        1e-4,                   'L2 penalty on the weights')
 cmd:option('-momentum',           0.95,                    'momentum')
-cmd:option('-distance_ratio',           0.05,                    'distance ratio')
+cmd:option('-distance_ratio',           1.0,                    'distance ratio')
 cmd:option('-max_distance_ratio',           1.0,                    'distance ratio')
 cmd:option('-distance_increment',           0.001,                    'distance increment')
+--cmd:option('-distance_ratio',           0.05,                    'distance ratio')
+--cmd:option('-max_distance_ratio',           1.0,                    'distance ratio')
+--cmd:option('-distance_increment',           0.001,                    'distance increment')
 -- cmd:option('-batchSize',          128,                    'batch size')
 -- cmd:option('-batchSize',          1,                    'batch size')
 --cmd:option('-batchSize',          8,                    'batch size')
@@ -477,6 +480,7 @@ print ("-----436")
 local bestErr = 10000
 local bestTrainErr = 10000
 local epoch = 1
+local baselineTrainErr = 1000
 print '\n==> Starting Training\n'
 while epoch ~= opt.epoch do
     print('Epoch ' .. epoch)
@@ -521,14 +525,19 @@ while epoch ~= opt.epoch do
 
 
     epoch = epoch+1
-    if bestTrainErr > ErrTrain then
-        bestTrainErr = ErrTrain
-        distance_ratio = distance_ratio + distance_increment*(max_distance_ratio - distance_ratio)
-        if distance_ratio > max_distance_ratio then
-            distance_ratio = max_distance_ratio
+
+    if epoch == 1 then
+        baselineTrainErr = ErrTrain*0.01
+    else
+        if baselineTrainErr*1.005 >= ErrTrain then
+            distance_ratio = distance_ratio + distance_increment*(max_distance_ratio - distance_ratio)
+            if distance_ratio > max_distance_ratio then
+                distance_ratio = max_distance_ratio
+            end
+            Loss:ResetTargetValue(distance_ratio, 1)
+            ErrorLoss:ResetTargetValue(distance_ratio, 1)
         end
-        Loss:ResetTargetValue(distance_ratio)
-        ErrorLoss:ResetTargetValue(distance_ratio)
+        baselineTrainErr = baselineTrainErr + 0.95*(ErrTrain - baselineTrainErr)
     end
 end
 

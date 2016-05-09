@@ -1,3 +1,3 @@
 #!/bin/bash
 
-CUDA_VISIBLE_DEVICES=3 th MainExtractNetFromTripletNet.lua
+CUDA_VISIBLE_DEVICES=0 th MainExtractNetFromTripletNet.lua

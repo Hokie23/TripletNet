@@ -14,9 +14,9 @@ function DistanceRatioCriterion:__init(max_value)
     self.MaxTargetValue = max_value or math.sqrt(2)
 end
 
-function DistanceRatioCriterion:ResetTargetValue(max_value)
+function DistanceRatioCriterion:ResetTargetValue(max_value, target_dim)
     self.MaxTargetValue = max_value
-    self.Target[{{},target}] = self.MaxTargetValue
+    self.Target[{{},target_dim}] = self.MaxTargetValue
 end
 
 function DistanceRatioCriterion:createTarget(input, target)
