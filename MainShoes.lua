@@ -380,7 +380,7 @@ function Train(DataC, epoch)
                         --print("y:", y)
 
                         -- print( "lerr: ", lerr*100.0/y[1]:size(1) )
-                        print( string.format("[epoch:%d, mdist=%f]: Train lerr: %e(%e)", epoch, distance_ratio, lerr, lerr/distance_ratio ) )
+                        print( string.format("[epoch:%d, mdist=%f]: Train lerr: %f(%f)", epoch, distance_ratio, lerr, lerr/distance_ratio ) )
 
                         err = err + lerr
                         xlua.progress(TrainSampleStage.current, TrainSampleStage.total_size )
@@ -459,7 +459,7 @@ function Test(DataC, epoch)
                     local y = TripletNet:forward({x[1],x[2],x[3]})
                     local lerr = ErrorCount(y)
                     --print( "Test lerr: ", lerr*100.0/y[1]:size(1) )
-                    print( string.format("[epoch:%d, mdist=%f]: Test lerr: %e(%e)", epoch, distance_ratio, lerr, lerr/distance_ratio ) )
+                    print( string.format("[epoch:%d, mdist=%f]: Test lerr: %f(%f)", epoch, distance_ratio, lerr, lerr/distance_ratio ) )
                     err = err + lerr
                     xlua.progress(num*DataC.BatchSize, DataC:size())
                     num = num +1

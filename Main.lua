@@ -294,6 +294,7 @@ local thread_pool = threads.Threads( nthread, function(idx)
                 end)
 
 print ("-------261") 
+local bestTrainErr = 10000
 function Train(DataC, epoch)
     print ("RunTrain")
     local err = 0
@@ -380,7 +381,7 @@ function Train(DataC, epoch)
                         --print("y:", y)
 
                         -- print( "lerr: ", lerr*100.0/y[1]:size(1) )
-                        print( string.format("[epoch:%d, mdist=%f]: Train lerr: %e(%e)", epoch, distance_ratio, lerr, lerr/distance_ratio ) )
+                        print( string.format("[epoch:%d, mdist=%f]: Train lerr: %f(%f), best=%f", epoch, distance_ratio, lerr, lerr/distance_ratio, bestTrainErr ) )
 
                         err = err + lerr
                         xlua.progress(TrainSampleStage.current, TrainSampleStage.total_size )
@@ -478,7 +479,6 @@ end
 
 print ("-----436")
 local bestErr = 10000
-local bestTrainErr = 10000
 local epoch = 1
 local baselineTrainErr = 1000
 print '\n==> Starting Training\n'
@@ -499,7 +499,7 @@ while epoch ~= opt.epoch do
     torch.save(weights_filename .. 'optim.w.t7' .. epoch, optimizer.Parameters[1])
     --torch.save(weights_filename .. epoch, tw)
     --torch.save(weights_filename .. 'tripletnet.t7' .. epoch, TripletNet)
-    print( string.format('[epoch #%d:%f]:%s Training Error = %f(%f)', epoch, distance_ratio, opt.save, ErrTrain, ErrTrain/distance_ratio) )
+    print( string.format('[epoch #%d:%f]:%s Training Error = %f(%f), bestTrainErr=%f', epoch, distance_ratio, opt.save, ErrTrain, ErrTrain/distance_ratio, bestTrainErr) )
     local ErrTest = Test(TestDataContainer, epoch)
     if bestErr > ErrTest then
         print ("Save Best")
