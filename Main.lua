@@ -526,18 +526,17 @@ while epoch ~= opt.epoch do
 
     epoch = epoch+1
 
-    if epoch == 1 then
-        baselineTrainErr = ErrTrain*0.01
-    else
-        if baselineTrainErr*1.005 >= ErrTrain then
-            distance_ratio = distance_ratio + distance_increment*(max_distance_ratio - distance_ratio)
-            if distance_ratio > max_distance_ratio then
-                distance_ratio = max_distance_ratio
-            end
-            Loss:ResetTargetValue(distance_ratio, 1)
-            ErrorLoss:ResetTargetValue(distance_ratio, 1)
+    if bestTrainErr > ErrTrain then
+        bestTrainErr = ErrTrain
+    end
+
+    if bestTrainErr*1.05 >= ErrTrain then
+        distance_ratio = distance_ratio + distance_increment*(max_distance_ratio - distance_ratio)
+        if distance_ratio > max_distance_ratio then
+            distance_ratio = max_distance_ratio
         end
-        baselineTrainErr = baselineTrainErr + 0.1*(ErrTrain - baselineTrainErr)
+        Loss:ResetTargetValue(distance_ratio, 1)
+        ErrorLoss:ResetTargetValue(distance_ratio, 1)
     end
 end
 
