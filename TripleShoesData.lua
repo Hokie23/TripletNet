@@ -2,21 +2,26 @@ require "csvigo"
 require 'image'
 require 'math'
 require 'loadutils'
-require 'sysutils'
 
 local debugger = require('fb.debugger')
 
+local dbname = 'shoes'
 local opt = opt or {}
 local PreProcDir = opt.preProcDir or './'
 local Whiten = opt.whiten or false
-local DataPath = opt.datapath or '/data1/fantajeon/torch/TripletNet/properties/'
-local imagePath = opt.imagepath or '/data2/freebee/Images/'
+local DataPath = opt.datapath or '/data1/fantajeon/torch/TripletNet/'
+local SimpleNormalization = (opt.normalize==1) or false
+local imagepath = nil
+assert(dbname~= nil, 'dbname required')
+imagePath = opt.imagepath or '/data2/freebee/Images/'
+assert(imagePath~= nil, 'imaegPath is empty')
+
 
 local TestData
 local TrainData
 local Classes
 local ImagePool = {}
-local lu = loadutils(imagePath )
+local lu = loadutils( {imagePath} )
 
 function dist(a, b)
     --local d = (a -b)*(a-b)
@@ -33,6 +38,7 @@ function LoadNormalizedResolutionImageCenterCrop(filename, jitter)
 end
 
 function LoadNormalizedResolutionImage(filename, jitter)
+    --print ("LoadNormalizedResolutionImage", filename)
     return lu:LoadNormalizedResolutionImage(filename, jitter)
 end
 
@@ -48,10 +54,181 @@ function ShuffleTrain(db, SampleState)
     SampleState.current = 1
 end
 
+function SelectListTriplets(embedding_net, db, size, TensorType, SampleStage)
+    print ("select list triplets", size)
+
+    local data = db.data
+    print ("dbsize:", #data.anchor_name_list)
+    local list = {}
+    local nClasses = #data.anchor_name_list 
+
+    local isend = false
+    local current = SampleStage.current or 1
+    while #list < size do
+        local anchor_img
+        local anchor_vector, positive_vector, negative_vector
+        local anchor_jitter, positive_jitter, negative_jitter
+
+        local ap_dist, an_dist
+        print ("generate list #" .. current .. "/#" .. #data.anchor_name_list .. string.format("[%d-#s%d]",current, SampleStage.current) )
+        local c1, anchor_name, hard_positive_name, semi_hard_negative_name
+        --c1 = math.random(#candidate_anchor_list)
+        c1 = current
+
+        local nsz = torch.LongStorage(4)
+        while true do
+            hard_positive_name = nil
+            anchor_name = data.anchor_name_list[c1]
+            local batch = torch.Tensor():type( TensorType )
+            --print ( 'anchor_name:', anchor_name )
+
+            anchor_img, anchor_jitter = LoadNormalizedResolutionImage(anchor_name)
+            assert(anchor_img ~= nil)
+            nsz[1] = 1
+            nsz[2] = 3
+            nsz[3] = 299
+            nsz[4] = 299
+            batch:resize(nsz)
+            batch[1]:copy(anchor_img)
+
+            --print ("anchor_image:size", anchor_img:size())
+            a_output = embedding_net:forward( batch )
+            anchor_vector = a_output:clone()
+
+            pos_of_anchor = data.positive[anchor_name]
+            if pos_of_anchor ~= nil then
+                local dupcheck = {}
+                local batch_name = {}
+                local batch_jitter = {}
+                minbatchSize = math.min(#pos_of_anchor,4)
+                nsz[1] = minbatchSize
+                batch:resize(nsz)
+                for pi=1,minbatchSize do
+                    positive_name = pos_of_anchor[math.random(#pos_of_anchor)]
+                    local img, p_jitter = LoadNormalizedResolutionImage(positive_name) 
+                    assert(img ~= nil)
+                    table.insert(batch_name, positive_name)
+                    table.insert(batch_jitter, p_jitter)
+                    batch[pi]:copy(img)
+                end
+
+                positive_vector = embedding_net:forward( batch )
+                local max_pdist = -1 
+                if minbatchSize == 1 then
+                    ok, bdist = pcall(dist,anchor_vector, positive_vector)
+                    if ok == false then
+                        print ("******:", minbatchSize )
+                        print("positive error:", positive_vector:size())
+                    end
+                    max_pdist = bdist
+                    hard_positive_name = batch_name[1]
+                    positive_jitter = batch_jitter[1]
+                else
+                    for pi=1,minbatchSize do
+                        ok, bdist = pcall(dist,anchor_vector, positive_vector)
+                        if bdist > max_pdist then
+                            max_pdist = bdist
+                            hard_positive_name = batch_name[pi]
+                            positive_jitter = batch_jitter[pi]
+                        end
+                    end
+                end
+
+                ap_dist = max_pdist
+                if ap_dist >= 0 then
+                    --print ("hard_positive_name:", hard_positive_name)
+                    break
+                end
+            else
+                print ("empty positive", anchor_name)
+            end
+            c1 = math.random(#candidate_anchor_list)
+        end
+
+        local neg_batch = torch.Tensor():type( TensorType )
+        nsz[1] = 4
+        neg_batch:resize( nsz )
+        bisfound = false
+
+        --print ("anchor_name", anchor_name, "ap_dist:", ap_dist)
+        local small_dist = 99999
+        semi_hard_negative_name = nil
+        for trial=1,10 do
+            local neg_batch_name = {}
+            local neg_batch_jitter = {}
+            for ni=1,4 do
+                local neg_of_anchor = data.negative[anchor_name]
+                if neg_of_anchor == nil or math.random(2) == 1 then
+                    local n1 = c1
+                    local n3 = math.random( #data.all_negative_list )
+                    negative_name = data.all_negative_list[n3]
+                    while negative_name  == anchor_name do
+                        n3 = math.random( #data.all_negative_list )
+                        negative_name = data.all_negative_list[n3]
+                    end
+                else
+                    local n3 = math.random(#neg_of_anchor)
+                    negative_name = neg_of_anchor[n3]
+                end
+                local img, n_jitter = LoadNormalizedResolutionImage(negative_name)
+                assert(img ~= nil )
+                table.insert(neg_batch_name, negative_name)
+                table.insert(neg_batch_jitter, n_jitter)
+                neg_batch[ni]:copy(img)
+            end
+
+            negative_vector = embedding_net:forward(neg_batch)
+            --local small_dist = 99999
+            --semi_hard_negative_name = nil
+            for ni=1,4 do
+                bdist = dist(anchor_vector, negative_vector[ni])
+                --print ("negative bdist", bdist)
+                if bdist > 0.000002 then
+                    if (bdist > ap_dist and bdist < small_dist) or math.random(10) == 1 then
+                        small_dist = bdist
+                        semi_hard_negative_name = neg_batch_name[ni]
+                        negative_jitter = neg_batch_jitter[ni]
+                    end
+                end
+            end
+
+            if trial > 5 and semi_hard_negative_name ~= nil then
+                an_dist = small_dist
+                bisfound = true
+                break
+            end
+        end
+
+        --print(anchor_name, negative_name, positive_name)
+       
+        if bisfound then
+            print ("anchor_name", anchor_name, "ap_dist:", ap_dist, "an_dist", an_dist)
+            print ("anchor_name", anchor_name, "n:", semi_hard_negative_name, "p:", hard_positive_name)
+            local exemplar_name = {anchor_name, semi_hard_negative_name, hard_positive_name}
+            local exemplar_jitter = {anchor_jitter, negative_jitter, positive_jitter}
+            local exemplar = {names=exemplar_name, jitter=exemplar_jitter}
+            table.insert(list, exemplar)
+            print ("exemplar", exemplar)
+        end
+
+        --current = current + 100
+        current = current + 1
+        if current > #data.anchor_name_list then
+            isend = true
+            current = 1
+        end
+    end
+
+    SampleStage.isend = isend
+    SampleStage.current = current
+    --print ("Selection Generate:", #list)
+    return list
+end
+
 function SelectListTripletsSimple(db, size, TensorType, SampleStage)
     local data = db.data
     local list = {}
-    print ("generate list triplets", size, string.format("%d/%d", SampleStage.current, #data.anchor_name_list) )
+    print ("generate simple list triplets", size, string.format("%d/%d", SampleStage.current, #data.anchor_name_list) )
 
     local isend = false
     local current = SampleStage.current or 1
@@ -62,11 +239,16 @@ function SelectListTripletsSimple(db, size, TensorType, SampleStage)
 
         c1 = current
         local isbreak = (function() 
-            anchor_name = data.anchor_name_list[c1].filename
+            anchor_name = data.anchor_name_list[c1]
+
+            pos_of_anchor = data.positive[anchor_name]
+            if pos_of_anchor == nil then
+                return nil
+            end
             positive_name = pos_of_anchor[math.random(#pos_of_anchor)]
 
             local neg_of_anchor = data.negative[anchor_name]
-            if neg_of_anchor == nil or math.random(3) == 0 then
+            if neg_of_anchor == nil or math.random(2) == 1 then
                 local n1 = c1
                 local n3 = math.random( #data.all_negative_list )
                 negative_name = data.all_negative_list[n3]
@@ -96,8 +278,9 @@ function SelectListTripletsSimple(db, size, TensorType, SampleStage)
             break
         end
 
-        current = current + 1
-        --current = current + 1000
+        --current = current + 1
+        --current = current + 100
+        current = current + 5
         if current > #data.anchor_name_list then
             isend = true
             current = 1
@@ -110,14 +293,15 @@ function SelectListTripletsSimple(db, size, TensorType, SampleStage)
 end
 
 
-function GenerateListTriplets(db, size, prefix)
+function GenerateListTriplets(db, size, prefix, SampleStage)
     print ("generate list triplets", size)
     local data = db.data
     local list = {}
     local nClasses = #data.anchor_name_list 
-    --for i=1, size,100 do
-    for i=1, size do
-        --print ("generate list #" .. i .. "/#" .. size)
+    --for i=1, size, 100 do
+    for i=1, size, 5 do
+    --for i=1, size do
+        print ("generate list #" .. i .. "/#" .. size)
         local c1, anchor_name, positive_name, negative_name
         c1 = i
         while true do
@@ -127,6 +311,8 @@ function GenerateListTriplets(db, size, prefix)
             if pos_of_anchor ~= nil then
                 positive_name = pos_of_anchor[math.random(#pos_of_anchor)]
                 break
+            else
+                print ("pos empty", anchor_name)
             end
             c1 = math.random(nClasses)
         end
@@ -169,136 +355,7 @@ function countTableSize(table)
     return n
 end
 
-
-function ParsingShoes(m)
-    local path, file, extension = splitfilename(m[2])
-    local filename = file .. extention
-    local category = m[3]
-    local box = {x=m[4],y=m[5],width=m[6],height=m[7]}
-    local properties = torch.Tensor(39):zero()
-
-    local gender = m[8]
-    if gender = '성인남성' then
-        properties[1] = 1
-    elseif gender = '성인여성' then
-        properties[2] = 1
-    elseif gender = '아동남성' then
-        properties[3] = 1
-    elseif gender = '아동여성' then
-        properties[4] = 1
-    end
-
-    local material = m[9]
-    if material = '가죽' then
-        properties[5] = 1
-    elseif material = '천' then
-        properties[6] = 1
-    elseif material = '고무' then
-        properties[7] = 1
-    end
-
-    local ankle = m[10]
-    if ankle = '복숭아뼈아래' then
-        properties[8] = 1
-    elseif ankle = '복숭아뼈위' then
-        properties[9] = 1
-    elseif ankle = '종아리' then
-        properties[10] = 1
-    elseif ankle = '무릎' then
-        properties[11] = 1
-    end
-
-    local heels = m[11]
-    if heels = '로우' then
-        properties[12] = 1
-    elseif heels = '미드' then
-        properties[13] = 1
-    elseif heels = '하이' then
-        properties[14] = 1
-    end
-
-    local pattern = m[12]
-    if pattern = '무지' then
-        properties[15] = 1
-    elseif pattern = '브랜드 로고' then
-        properties[16] = 1
-    elseif pattern = '스트라이프' then
-        properties[17] = 1
-    elseif pattern = '도트' then
-        properties[18] = 1
-    elseif pattern = '호피/지브라' then
-        properties[19] = 1
-    elseif pattern = '도형' then
-        properties[20] = 1
-    elseif pattern = '이니셜' then
-        properties[21] = 1
-    elseif pattern = '밀리터리' then
-        properties[22] = 1
-    elseif pattern = '배색' then
-        properties[23] = 1
-    elseif pattern = '꽃무늬' then
-        properties[24] = 1
-    elseif pattern = '뱀피' then
-        properties[25] = 1
-    elseif pattern = '체크' then
-        properties[26] = 1
-    elseif pattern = '일러스트' then
-        properties[27] = 1
-    end
-
-    -- forefood
-    if m[13] = 'O' then
-        properties[28] = 1
-    end
-    -- 끈
-    if m[14] = 'O' then
-        properties[29] = 1
-    end
-    -- 지퍼
-    if m[15] = 'O' then
-        properties[30] = 1
-    end
-    -- 앞트임
-    if m[16] = 'O' then
-        properties[31] = 1
-    end
-    -- 뒷트임
-    if m[17] = 'O' then
-        properties[32] = 1
-    end
-    -- 메쉬
-    if m[18] = 'O' then
-        properties[33] = 1
-    end
-    -- 리본장식
-    if m[19] = 'O' then
-        properties[34] = 1
-    end
-    -- 단추장식
-    if m[20] = 'O' then
-        properties[35] = 1
-    end
-    -- 버클
-    if m[21] = 'O' then
-        properties[36] = 1
-    end
-    -- 클립
-    if m[22] = 'O' then
-        properties[37] = 1
-    end
-    -- 벨트
-    if m[23] = 'O' then
-        properties[38] = 1
-    end
-    -- 비즈/징
-    if m[24] = 'O' then
-        properties[39] = 1
-    end
-
-    return filename, box, properties
-end
-
-function LoadData(filepath, check_imagefile)
+function LoadDataShoes(filepath, check_imagefile)
     local Data = {data={},imagepool={}}
     local positive_pairs = {}
     local negative_pairs = {}
@@ -314,35 +371,70 @@ function LoadData(filepath, check_imagefile)
 
     --for i=1,#label_pairs,1000 do
     for i=1,#label_pairs do
-        local isbreak = (function() 
-                m = label_pairs[i]
-                local a_name, box, properties_vector = ParsingShoes(m) 
-                if a_name == nil then
-                    return ""
-                end
+        --print (label_pairs)
+        --debugger.enter()
+        m = label_pairs[i]
+        local a_name = m[2]
+        local t_name = m[3]
+        local p_or_n = m[4]
+        local bcontinue = false
 
+        local cond = (function() 
+                if a_name == t_name or a_name == nil then
+                    return "error"
+                end
                 if check_imagefile then
                     if ImagePoolByName[a_name] == nil then
                         local img = LoadNormalizedResolutionImage(a_name)
-                        if isColorImage(img) then
+                        if lu.isColorImage(img) then
                             ImagePoolByName[a_name] = true
-                            return ""
+                        else
+                            return "error"
+                        end
+                    end
+                    if ImagePoolByName[t_name] == nil then
+                        local img = LoadNormalizedResolutionImage(t_name)
+                        if lu.isColorImage(img) then
+                            ImagePoolByName[t_name] = true
+                        else
+                            return "error"
                         end
                     end
                 end
 
-                table.insert(anchor_name_list, {filename=a_name, box=box, properties=properties_vector})
-                return ""
+                if anchor_name_to_idx[a_name] == nil then
+                    table.insert(anchor_name_list, a_name)
+                    anchor_count = anchor_count + 1
+                    anchor_name_to_idx[a_name] = anchor_count
+                end
+                if p_or_n == '1' then
+                    if positive_pairs[a_name] == nil then
+                        positive_pairs[a_name] = {t_name}
+                    else
+                        table.insert(positive_pairs[a_name], t_name )
+                    end
+                else 
+                    if negative_pairs[a_name] == nil then
+                        negative_pairs[a_name] = {t_name}
+                    else
+                        table.insert(negative_pairs[a_name], t_name )
+                    end
+                end
+
+                return "succeeded"
             end)()
-        if isbreak == "break" then
-            break
+        if cond == "succeeded" then
+            print (i, #label_pairs, 100.0*(i/#label_pairs), "anchor", #anchor_name_list)
+        else
+            print("error", a_name)
         end
-        print (i, #label_pairs, 100.0*(i/#label_pairs), "anchor", #anchor_name_list)
     end
 
     print("loaded: " .. #anchor_name_list)
     print("loaded imagepool: " .. #ImagePool)
     Data.data.anchor_name_list = anchor_name_list
+    Data.data.positive = positive_pairs
+    Data.data.negative = negative_pairs
     Data.Resolution = {3,299,299}
 
     print ("Data Size:", #Data.data.anchor_name_list)
@@ -350,19 +442,24 @@ function LoadData(filepath, check_imagefile)
     return Data
 end
 
+local save_filename = PreProcDir .. '/' .. dbname .. '_save.t7' 
 function save_data()
-    torch.save(PreProcDir .. '/shoes_save.t7', 'save')
+    torch.save(save_filename, 'save')
     torch.save(PreProcDir .. '/train.resolution.t7', TrainData.Resolution)
     torch.save(PreProcDir .. '/train.data.anchor_name_list.t7', TrainData.data.anchor_name_list)
+    torch.save(PreProcDir .. '/train.data.positive.t7', TrainData.data.positive)
+    torch.save(PreProcDir .. '/train.data.negative.t7', TrainData.data.negative)
     torch.save(PreProcDir .. '/train.data.all_negative_list.t7', TrainData.data.all_negative_list)
 
     torch.save(PreProcDir .. '/test.resolution.t7', TestData.Resolution)
     torch.save(PreProcDir .. '/test.data.anchor_name_list.t7', TestData.data.anchor_name_list)
+    torch.save(PreProcDir .. '/test.data.positive.t7', TestData.data.positive)
+    torch.save(PreProcDir .. '/test.data.negative.t7', TestData.data.negative)
     torch.save(PreProcDir .. '/test.data.all_negative_list.t7', TestData.data.all_negative_list)
 end
 
 function load_cached_data()
-    local checkfile = PreProcDir .. '/shoes_save.t7'
+    local checkfile = save_filename
     if path.exists( checkfile ) == false then
         print ( string.format("cannot find %s", checkfile) )
         return nil
@@ -370,14 +467,34 @@ function load_cached_data()
     TrainData = {data={},Resolution={}}
     TrainData.Resolution = torch.load(PreProcDir .. '/train.resolution.t7')
     TrainData.data.anchor_name_list = torch.load(PreProcDir .. '/train.data.anchor_name_list.t7')
+    TrainData.data.positive = torch.load(PreProcDir .. '/train.data.positive.t7')
+    TrainData.data.negative = torch.load(PreProcDir .. '/train.data.negative.t7')
     TrainData.data.all_negative_list = torch.load(PreProcDir .. '/train.data.all_negative_list.t7')
 
     TestData = {data={},Resolution={}}
     TestData.Resolution = torch.load(PreProcDir .. '/test.resolution.t7')
     TestData.data.anchor_name_list = torch.load(PreProcDir .. '/test.data.anchor_name_list.t7')
+    TestData.data.positive = torch.load(PreProcDir .. '/test.data.positive.t7')
+    TestData.data.negative = torch.load(PreProcDir .. '/test.data.negative.t7')
     TestData.data.all_negative_list = torch.load(PreProcDir .. '/test.data.all_negative_list.t7')
 
     return { TrainData = TrainData, TestData = TestData }
+end
+
+function FilterOutEmptyPositive(Data)
+    local filtered_anchor = {}
+    for i=1,#Data.data.anchor_name_list do
+        local anchor_name = Data.data.anchor_name_list[i]
+        local pos_of_anchor = Data.data.positive[anchor_name] 
+        if pos_of_anchor ~= nil then
+            table.insert(filtered_anchor,anchor_name)
+        end
+    end
+
+    print ("#anchorlist", #Data.data.anchor_name_list, "-> #filtered list", #filtered_anchor)
+    Data.data.anchor_name_list = filtered_anchor
+
+    return Data
 end
 
 function LoadNegativeData(negative_filepath)
@@ -390,7 +507,7 @@ function LoadNegativeData(negative_filepath)
         xlua.progress(i, #negative_list)
         neg_name = negative_list[i][1]
         local img = LoadNormalizedResolutionImage(neg_name)
-        if isColorImage(img) then
+        if lu.isColorImage(img) then
             table.insert(negative_namelist, neg_name)
         end
     end
@@ -399,8 +516,6 @@ function LoadNegativeData(negative_filepath)
     return negative_namelist
 end
 
---save_filename = PreProcDir .. '/fashion_data.t7' 
-save_filename = PreProcDir .. '/shoes_save.t7' 
 
 local NegativeList = {}
 negative_cache_filename = PreProcDir .. '/negative_list.t7'
@@ -420,8 +535,8 @@ if path.exists(save_filename) then
     RetData = load_cached_data()
     RetData.cache = true
 else
-    TrainData = LoadData('excel_1459334593242.shoes.train.csv', false)
-    TestData = LoadData('excel_1459334593242.shoes.valid.csv', false)
+    TrainData = LoadDataShoes('shoes_pair.train.csv', true)
+    TestData = LoadDataShoes('shoes_pair.valid.csv', true)
     TrainData.data.all_negative_list = NegativeList
     TestData.data.all_negative_list = NegativeList
     RetData= {TrainData=TrainData, TestData=TestData}

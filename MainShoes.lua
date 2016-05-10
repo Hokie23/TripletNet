@@ -30,7 +30,7 @@ local debugger = require( 'fb.debugger' )
 cmd = torch.CmdLine()
 cmd:addTime()
 cmd:text()
-cmd:text('Training a Triplet network on Fashion Database')
+cmd:text('Training a Triplet network on Shoes Database')
 cmd:text()
 cmd:text('==>Options')
 
@@ -50,9 +50,12 @@ cmd:option('-LR',                 0.001,                    'learning rate')
 cmd:option('-LRDecay',            1e-6,                   'learning rate decay (in # samples)')
 cmd:option('-weightDecay',        1e-4,                   'L2 penalty on the weights')
 cmd:option('-momentum',           0.95,                    'momentum')
-cmd:option('-distance_ratio',           0.01,                    'distance ratio')
+cmd:option('-distance_ratio',           0.2,                    'distance ratio')
 cmd:option('-max_distance_ratio',           1.0,                    'distance ratio')
-cmd:option('-distance_increment',           0.05,                    'distance increment')
+cmd:option('-distance_increment',           0.001,                    'distance increment')
+--cmd:option('-distance_ratio',           0.05,                    'distance ratio')
+--cmd:option('-max_distance_ratio',           1.0,                    'distance ratio')
+--cmd:option('-distance_increment',           0.001,                    'distance increment')
 -- cmd:option('-batchSize',          128,                    'batch size')
 -- cmd:option('-batchSize',          1,                    'batch size')
 --cmd:option('-batchSize',          8,                    'batch size')
@@ -71,7 +74,7 @@ cmd:option('-load',               '',                     'load existing net wei
 cmd:option('-save',               os.date():gsub(' ',''), 'save directory')
 
 cmd:text('===>Data Options')
-cmd:option('-dataset',            'shoes',              'Dataset - Shoes')
+cmd:option('-dataset',            'shoes',              'Dataset - shoes')
 --cmd:option('-size',               640000,                 'size of training list' )
 --cmd:option('-size',               640,                 'size of training list' )
 --cmd:option('-size',               180,                 'size of training list' )
@@ -151,7 +154,7 @@ end
 
 --TripletNet:RebuildNet() --if using TripletNet instead of TripletNetBatch
 
-local data = require 'TripleData'
+local data = require 'TripleShoesData'
 --local data = require 'TripleDataWithProperties'
 local SizeTrain = opt.size or 640000
 --local SizeTest = SizeTrain*0.1
@@ -377,10 +380,10 @@ function Train(DataC, epoch)
                         --print("y:", y)
 
                         -- print( "lerr: ", lerr*100.0/y[1]:size(1) )
-                        print( string.format("[epoch #%d]: Train lerr: %e", epoch, lerr ) )
+                        print( string.format("[epoch:%d, mdist=%f]: Train lerr: %e(%e)", epoch, distance_ratio, lerr, lerr/distance_ratio ) )
 
                         err = err + lerr
-                        xlua.progress(num*DataC.BatchSize, TrainSampleStage.total_size )
+                        xlua.progress(TrainSampleStage.current, TrainSampleStage.total_size )
                         num = num + 1
                     end,
                     jobparam 
@@ -456,7 +459,7 @@ function Test(DataC, epoch)
                     local y = TripletNet:forward({x[1],x[2],x[3]})
                     local lerr = ErrorCount(y)
                     --print( "Test lerr: ", lerr*100.0/y[1]:size(1) )
-                    print( string.format("[epoch:%d]: Test lerr: %e", epoch, lerr ) )
+                    print( string.format("[epoch:%d, mdist=%f]: Test lerr: %e(%e)", epoch, distance_ratio, lerr, lerr/distance_ratio ) )
                     err = err + lerr
                     xlua.progress(num*DataC.BatchSize, DataC:size())
                     num = num +1
@@ -475,7 +478,9 @@ end
 
 print ("-----436")
 local bestErr = 10000
+local bestTrainErr = 10000
 local epoch = 1
+local baselineTrainErr = 1000
 print '\n==> Starting Training\n'
 while epoch ~= opt.epoch do
     print('Epoch ' .. epoch)
@@ -485,30 +490,27 @@ while epoch ~= opt.epoch do
     EmbeddingNet:clearState()
     TripletNet:clearState()
 
-    local ew, egradp = EmbeddingNet:parameters()
-    local lightmodel = EmbeddingNet:clone('weight', 'bias', 'running_mean', 'running_std', 'running_var')
+    local lightmodel = TripletNet.nets[1]:clone('weight', 'bias', 'running_mean', 'running_std', 'running_var')
     local tw, tgradp = TripletNet:parameters()
 
     --optimizer.Parameters = {tw, tgradp},
 
-    torch.save(network_filename .. epoch, lightmodel)
-    torch.save(weights_filename .. 'embedding.t7' .. epoch, ew)
+    torch.save(network_filename .. 'tripletnet.t7' .. epoch, lightmodel)
     torch.save(weights_filename .. 'optim.w.t7' .. epoch, optimizer.Parameters[1])
     --torch.save(weights_filename .. epoch, tw)
     --torch.save(weights_filename .. 'tripletnet.t7' .. epoch, TripletNet)
-    print( string.format('[epoch #%d] Training Error = %f', epoch,  ErrTrain) )
+    print( string.format('[epoch #%d:%f]:%s Training Error = %f(%f)', epoch, distance_ratio, opt.save, ErrTrain, ErrTrain/distance_ratio) )
     local ErrTest = Test(TestDataContainer, epoch)
     if bestErr > ErrTest then
         print ("Save Best")
         bestErr = ErrTest
         torch.save(network_filename .. 'best.embedding.model.t7', lightmodel)
-        torch.save(weights_filename .. 'best.embedding.w.t7', ew)
         torch.save(network_filename .. 'best.tripletnet.t7', TripletNet)
         torch.save(weights_filename .. 'best.tripletnet.w.t7', tw)
         torch.save(weights_filename .. 'best.optim.w.t7', optimizer.Parameters[1])
     end
 
-    print( string.format('[epoch #%d] Test Error = %f', epoch, ErrTest) )
+    print( string.format('[epoch #%d:%f] Test Error = %f(%f)', epoch, distance_ratio, ErrTest, ErrTest/distance_ratio) )
     Log:add{['Training Error']= ErrTrain* 100, ['Test Error'] = ErrTest* 100}
     Log:style{['Training Error'] = '-', ['Test Error'] = '-'}
     Log:plot()
@@ -523,13 +525,19 @@ while epoch ~= opt.epoch do
 
 
     epoch = epoch+1
-    if epoch % 5 == 0 then
-        distance_ratio = distance_ratio + distance_increment
-        if distance_ratio > max_distance_ratio then
-            distance_ratio = max_distance_ratio
+
+    if epoch == 1 then
+        baselineTrainErr = ErrTrain*0.01
+    else
+        if baselineTrainErr*1.005 >= ErrTrain then
+            distance_ratio = distance_ratio + distance_increment*(max_distance_ratio - distance_ratio)
+            if distance_ratio > max_distance_ratio then
+                distance_ratio = max_distance_ratio
+            end
+            Loss:ResetTargetValue(distance_ratio, 1)
+            ErrorLoss:ResetTargetValue(distance_ratio, 1)
         end
-        Loss:Reset(distance_ratio)
-        ErrorLoss:Reset(distance_ratio)
+        baselineTrainErr = baselineTrainErr + 0.95*(ErrTrain - baselineTrainErr)
     end
 end
 

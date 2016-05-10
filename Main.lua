@@ -537,7 +537,7 @@ while epoch ~= opt.epoch do
             Loss:ResetTargetValue(distance_ratio, 1)
             ErrorLoss:ResetTargetValue(distance_ratio, 1)
         end
-        baselineTrainErr = baselineTrainErr + 0.95*(ErrTrain - baselineTrainErr)
+        baselineTrainErr = baselineTrainErr + 0.1*(ErrTrain - baselineTrainErr)
     end
 end
 
