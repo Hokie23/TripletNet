@@ -13,6 +13,7 @@ require 'TripletEmbeddingCriterion'
 require 'cunn'
 require 'WorkerParam'
 require 'cudnn'
+metrics = require 'metrics'
 require 'eval'
 --local async = require('async')
 
@@ -470,10 +471,13 @@ function Test(DataC, epoch)
                     local y = TripletNet:forward({x[1],x[2],x[3]})
                     local lerr = ErrorCount(y)
 
-                    table.insert(conf, y[1])
-                    table.insert(conf, y[2])
-                    table.insert(label, -1)
-                    table.insert(label, 1)
+                    --debugger.enter()
+                    for xx=1,y:size(1) do
+                        table.insert(conf, y[xx][1])
+                        table.insert(label, -1)
+                        table.insert(conf, y[xx][2])
+                        table.insert(label, 1)
+                    end
                     --print( "Test lerr: ", lerr*100.0/y[1]:size(1) )
                     print( string.format("[epoch:%d, mdist=%f]: Test lerr: %f(%f), baselineTrainErr=%f", epoch, distance_ratio, lerr, lerr/distance_ratio, baselineTrainErr ) )
                     err = err + lerr
@@ -489,7 +493,10 @@ function Test(DataC, epoch)
         return 0, 0, 0, 0
     end
 
-    local rec, prec, ap, threshold1 = precision_recall(conf, label)
+    --debugger.enter()
+    local confTensor = torch.Tensor(conf):type('torch.DoubleTensor')
+    local labelTensor = torch.Tensor(label):type('torch.DoubleTensor')
+    local rec, prec, ap, threshold1 = precision_recall(confTensor, labelTensor)
     return (err/num), rec, prec, ap
 end
 
@@ -532,7 +539,7 @@ while epoch ~= opt.epoch do
         torch.save(weights_filename .. 'best.optim.w.t7', optimizer.Parameters[1])
     end
 
-    print( string.format('[epoch #%d:%f] Test Error = %f(%f), baselineTrainErr=%f, AP=%f, bestAP=%f, rec=%f, prec=%f', epoch, distance_ratio, ErrTest, ErrTest/distance_ratio, baselineTrainErr, AP, bestAP, rec, prec) )
+    print( string.format('[epoch #%d:%f] Test Error = %f(%f), baselineTrainErr=%f, AP=%f, bestAP=%f', epoch, distance_ratio, ErrTest, ErrTest/distance_ratio, baselineTrainErr, AP, bestAP) )
     Log:add{['Training Error']= ErrTrain* 100, ['Test Error'] = ErrTest* 100}
     Log:style{['Training Error'] = '-', ['Test Error'] = '-'}
     Log:plot()
