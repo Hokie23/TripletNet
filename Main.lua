@@ -486,7 +486,7 @@ function Test(DataC, epoch)
     end
     thread_pool:synchronize()
     if num == 0 then
-        return 0, 0
+        return 0, 0, 0, 0
     end
 
     local rec, prec, ap, threshold1 = precision_recall(conf, label)
@@ -520,7 +520,7 @@ while epoch ~= opt.epoch do
     --torch.save(weights_filename .. 'tripletnet.t7' .. epoch, TripletNet)
     print( string.format('[epoch #%d:%f]:%s Training Error = %f(%f), bestTrainErr=%f, baselineTrainErr=%f', epoch, distance_ratio, opt.save, ErrTrain, ErrTrain/distance_ratio, bestTrainErr, baselineTrainErr) )
 
-    local ErrTest, AP = Test(TestDataContainer, epoch)
+    local ErrTest, rec, prec, AP = Test(TestDataContainer, epoch)
     --if bestErr > ErrTest then
     if bestAP < AP  then
         print ("Save Best")
@@ -532,7 +532,7 @@ while epoch ~= opt.epoch do
         torch.save(weights_filename .. 'best.optim.w.t7', optimizer.Parameters[1])
     end
 
-    print( string.format('[epoch #%d:%f] Test Error = %f(%f), baselineTrainErr=%f', epoch, distance_ratio, ErrTest, ErrTest/distance_ratio, baselineTrainErr) )
+    print( string.format('[epoch #%d:%f] Test Error = %f(%f), baselineTrainErr=%f, AP=%f, bestAP=%f, rec=%f, prec=%f', epoch, distance_ratio, ErrTest, ErrTest/distance_ratio, baselineTrainErr, AP, bestAP, rec, prec) )
     Log:add{['Training Error']= ErrTrain* 100, ['Test Error'] = ErrTest* 100}
     Log:style{['Training Error'] = '-', ['Test Error'] = '-'}
     Log:plot()
