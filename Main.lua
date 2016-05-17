@@ -531,6 +531,7 @@ while epoch ~= opt.epoch do
     print( string.format('[epoch #%d:%f]:%s Training Error = %f(%f), bestTrainErr=%f, baselineTrainErr=%f', epoch, distance_ratio, opt.save, ErrTrain, ErrTrain/distance_ratio, bestTrainErr, baselineTrainErr) )
 
     local ErrTest, rec, prec, AP = Test(TestDataContainer, epoch)
+    print( string.format('[epoch #%d:%f] Test Error = %f(%f), baselineTrainErr=%f, AP=%f, bestAP=%f', epoch, distance_ratio, ErrTest, ErrTest/distance_ratio, baselineTrainErr, AP, bestAP) )
     --if bestErr > ErrTest then
     if bestAP < AP  then
         print ("Save Best")
@@ -543,8 +544,8 @@ while epoch ~= opt.epoch do
     end
 
     print( string.format('[epoch #%d:%f] Test Error = %f(%f), baselineTrainErr=%f, AP=%f, bestAP=%f', epoch, distance_ratio, ErrTest, ErrTest/distance_ratio, baselineTrainErr, AP, bestAP) )
-    Log:add{['Training Error']= ErrTrain* 100, ['Test Error'] = ErrTest* 100}
-    Log:style{['Training Error'] = '-', ['Test Error'] = '-'}
+    Log:add{['Training Error']= ErrTrain* 100, ['Test Error'] = ErrTest* 100, ['Average Precision'] = AP*100}
+    Log:style{['Training Error'] = '-', ['Test Error'] = '-', ['Average Precision'] = '-'}
     Log:plot()
     print ("ploted\n")
 
