@@ -8,6 +8,7 @@ require 'xlua'
 require 'trepl'
 require 'DistanceRatioCriterion'
 require 'DistanceRatioSoftMaxCriterion'
+require 'DistancePseudoRatioCriterion'
 require 'PairwiseDistanceOffset'
 require 'TripletEmbeddingCriterion'
 require 'cunn'
@@ -55,7 +56,7 @@ cmd:option('-weightDecay',        1e-4,                   'L2 penalty on the wei
 cmd:option('-momentum',           0.95,                    'momentum')
 cmd:option('-distance_ratio',           1.0,                    'distance ratio')
 cmd:option('-max_distance_ratio',           1.0,                    'distance ratio')
-cmd:option('-distance_increment',           0.003,                    'distance increment')
+cmd:option('-distance_increment',           0.02,                    'distance increment')
 --cmd:option('-distance_ratio',           0.05,                    'distance ratio')
 --cmd:option('-max_distance_ratio',           1.0,                    'distance ratio')
 --cmd:option('-distance_increment',           0.001,                    'distance increment')
@@ -128,11 +129,13 @@ EmbeddingNet:cuda()
 local TripletNet = nn.TripletNet(EmbeddingNet)
 --local Loss = nn.DistanceRatioCriterion()
 
-local Loss = nn.DistanceRatioCriterion(distance_ratio)
-local ErrorLoss = nn.DistanceRatioCriterion(distance_ratio)
+--local Loss = nn.DistanceRatioCriterion(distance_ratio)
+--local ErrorLoss = nn.DistanceRatioCriterion(distance_ratio)
 --local Loss = nn.DistanceRatioSoftMaxCriterion()
 --local ErrorLoss = nn.DistanceRatioSoftMaxCriterion()
 --local Loss = nn.TripletEmbeddingCriterion(0.2)
+local Loss = nn.DistancePseudoRatioCriterion(distance_ratio,1, 0)
+local ErrorLoss = nn.DistancePseudoRatioCriterion(distance_ratio, 1, 0)
 
 local Weights, Gradients = TripletNet:getParameters()
 TripletNet:cuda()
@@ -522,7 +525,7 @@ while epoch ~= opt.epoch do
     --optimizer.Parameters = {tw, tgradp},
 
     torch.save(network_filename .. 'tripletnet.t7' .. epoch, lightmodel)
-    torch.save(weights_filename .. 'optim.w.t7' .. epoch, optimizer.Parameters[1])
+    --torch.save(weights_filename .. 'optim.w.t7' .. epoch, optimizer.Parameters[1])
     --torch.save(weights_filename .. epoch, tw)
     --torch.save(weights_filename .. 'tripletnet.t7' .. epoch, TripletNet)
     print( string.format('[epoch #%d:%f]:%s Training Error = %f(%f), bestTrainErr=%f, baselineTrainErr=%f', epoch, distance_ratio, opt.save, ErrTrain, ErrTrain/distance_ratio, bestTrainErr, baselineTrainErr) )
