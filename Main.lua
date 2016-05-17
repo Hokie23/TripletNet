@@ -57,6 +57,7 @@ cmd:option('-momentum',           0.95,                    'momentum')
 cmd:option('-distance_ratio',           1.0,                    'distance ratio')
 cmd:option('-max_distance_ratio',           1.0,                    'distance ratio')
 cmd:option('-distance_increment',           0.02,                    'distance increment')
+cmd:option('-increment_policy',          true,                    'distance increment poliy')
 --cmd:option('-distance_ratio',           0.05,                    'distance ratio')
 --cmd:option('-max_distance_ratio',           1.0,                    'distance ratio')
 --cmd:option('-distance_increment',           0.001,                    'distance increment')
@@ -96,6 +97,7 @@ cmd:option('-visualize',          true,                  'display first level fi
 
 
 opt = cmd:parse(arg or {})
+increment_policy = opt.increment_policy or false
 distance_ratio = opt.distance_ratio
 max_distance_ratio = opt.max_distance_ratio
 distance_increment = opt.distance_increment
@@ -129,13 +131,13 @@ EmbeddingNet:cuda()
 local TripletNet = nn.TripletNet(EmbeddingNet)
 --local Loss = nn.DistanceRatioCriterion()
 
---local Loss = nn.DistanceRatioCriterion(distance_ratio)
---local ErrorLoss = nn.DistanceRatioCriterion(distance_ratio)
+local Loss = nn.DistanceRatioCriterion(distance_ratio)
+local ErrorLoss = nn.DistanceRatioCriterion(distance_ratio)
 --local Loss = nn.DistanceRatioSoftMaxCriterion()
 --local ErrorLoss = nn.DistanceRatioSoftMaxCriterion()
 --local Loss = nn.TripletEmbeddingCriterion(0.2)
-local Loss = nn.DistancePseudoRatioCriterion(distance_ratio,1, 0)
-local ErrorLoss = nn.DistancePseudoRatioCriterion(distance_ratio, 1, 0)
+--local Loss = nn.DistancePseudoRatioCriterion(distance_ratio,1, 0)
+--local ErrorLoss = nn.DistancePseudoRatioCriterion(distance_ratio, 1, 0)
 
 local Weights, Gradients = TripletNet:getParameters()
 TripletNet:cuda()
@@ -531,7 +533,6 @@ while epoch ~= opt.epoch do
     print( string.format('[epoch #%d:%f]:%s Training Error = %f(%f), bestTrainErr=%f, baselineTrainErr=%f', epoch, distance_ratio, opt.save, ErrTrain, ErrTrain/distance_ratio, bestTrainErr, baselineTrainErr) )
 
     local ErrTest, rec, prec, AP = Test(TestDataContainer, epoch)
-    print( string.format('[epoch #%d:%f] Test Error = %f(%f), baselineTrainErr=%f, AP=%f, bestAP=%f', epoch, distance_ratio, ErrTest, ErrTest/distance_ratio, baselineTrainErr, AP, bestAP) )
     --if bestErr > ErrTest then
     if bestAP < AP  then
         print ("Save Best")
@@ -557,25 +558,35 @@ while epoch ~= opt.epoch do
     end
 
 
-    if epoch == 1 then
+    if increment_policy then
         baselineTrainErr = ErrTrain
         bestTrainErr = baselineTrainErr
         baselineTrainStd = 1
+        distance_ratio = distance_ratio + distance_increment
+        if distance_ratio > max_distance_ratio then
+            distance_ratio = max_distance_ratio
+        end
     else
-        baselineTrainDelta = ErrTrain - baselineTrainErr
-        baselineTrainErr = baselineTrainErr + 0.95*baselineTrainDelta
-        if bestTrainErr > baselineTrainErr then
+        if epoch == 1 then
+            baselineTrainErr = ErrTrain
             bestTrainErr = baselineTrainErr
+            baselineTrainStd = 1
         else
-            if bestTrainErr * 1.01 >= baselineTrainErr or math.abs(baselineTrainDelta)/baselineTrainErr < 0.012 then
-                distance_ratio = distance_ratio + distance_increment*(max_distance_ratio - distance_ratio)
-                if distance_ratio > max_distance_ratio then
-                    distance_ratio = max_distance_ratio
+            baselineTrainDelta = ErrTrain - baselineTrainErr
+            baselineTrainErr = baselineTrainErr + 0.95*baselineTrainDelta
+            if bestTrainErr > baselineTrainErr then
+                bestTrainErr = baselineTrainErr
+            else
+                if bestTrainErr * 1.01 >= baselineTrainErr or math.abs(baselineTrainDelta)/baselineTrainErr < 0.012 then
+                    distance_ratio = distance_ratio + distance_increment*(max_distance_ratio - distance_ratio)
+                    if distance_ratio > max_distance_ratio then
+                        distance_ratio = max_distance_ratio
+                    end
+                    Loss:ResetTargetValue(distance_ratio, 1)
+                    ErrorLoss:ResetTargetValue(distance_ratio, 1)
+                    subepoch = 0
+                    bestTrainErr = bestTrainErr + 0.95*(baselineTrainErr - bestTrainErr)
                 end
-                Loss:ResetTargetValue(distance_ratio, 1)
-                ErrorLoss:ResetTargetValue(distance_ratio, 1)
-                subepoch = 0
-                bestTrainErr = bestTrainErr + 0.95*(baselineTrainErr - bestTrainErr)
             end
         end
     end
