@@ -16,7 +16,24 @@ projectlist = { {project='distance_pair_128_att_0411', linestyle='-'},
         {project='distance_pair_128_0428', linestyle='-'},
         {project='distance_pair_128_0508', linestyle='-'},
         {project='distance_pair_128_0508_forceince', linestyle='-'},
-        {project='distance_pair_1024', linestyle='-'}
+        {project='distance_pair_1024', linestyle='-'},
+        {project='distance_pair_128_0511', linestyle='-'},
+        {project='distance_pair_128_0511_fixed_1.0', linestyle='-'},
+        {project='distance_pair_128_0511_fixed_1.0_best', linestyle='-'},
+        {project='distance_pair_128_0511_inc_start_0.01', linestyle='-'},
+        {project='distance_pair_128_0511_inc_start_0.01_epoch166', linestyle='-'},
+        {project='distance_pair_128_0512_inc_start_0.01_epoch238', linestyle='-'},
+        {project='distance_pair_128_0512_inc_start_0.01_epoch237', linestyle='-'},
+        {project='distance_pair_128_0512_inc_start_0.01_satured_x1.2_epoch220', linestyle='-'},
+        {project='distance_pair_128_051_ThuMay91240522016_epoch314', linestyle='-'},
+        {project='distance_pair_128_0513_ThuMay121020402016_satured_x1.2', linestyle='-'},
+        {project='distance_pair_128_0513_softmax_epoch8', linestyle='-'},
+        {project='distance_pair_128_0513_softmax_FriMay131406142016_epoch20', linestyle='-'},
+        {project='distance_pair_128_0513_ThuMay121020402016_epoch389', linestyle='-'},
+        {project='distance_pair_128_0517_satured_FriMay131821252016_epoch513', linestyle='-'},
+        {project='distance_pair_128_0513_softmax_FriMay131406142016_epoch568', linestyle='-'},
+        {project='distance_pair_128_0517_forceinc_MonMay91240522016_epoch475', linestyle='-'}
+
     }
 
 cmd = torch.CmdLine()

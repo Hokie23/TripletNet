@@ -80,9 +80,9 @@ local replacePath = "/data1/october_11st/october_11st_imgs/"
 for i=1,#batch_items do
     local content_id, mid_category, category_name, imagepath = unpack(batch_items[i])
     local cond = (function() 
-            if category_name ~= 'shoes' then
-                return "stop/category"
-            end
+            --if category_name ~= 'shoes' then
+            --    return "stop/category"
+            --end
             imagepath = imagepath:gsub("/userdata2/index_11st_20151020/october_11st_imgdata/",replacePath )
             local img = lu:LoadNormalizedResolutionImageCenterCrop(imagepath)
             if img == nil then

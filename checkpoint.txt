@@ -62,3 +62,11 @@
 
 2016. 4. 7.
     Shared Weight를 제대로 저장하는 것인지 체크가 필요하다.
+
+2016.5.11. Output distance 조절
+    1.0으로 고정시켜놓고 threshold value보다 작은 것을 target으로 맞추는 과정은 성능이 떨어 졌다.
+    Output Distance를 서서히 올리면서 학습하는 것이 좋은 성능을 가졌다. 고정보다 서서히 올리는 것이 성능이 좋게 나왔다.
+    Adaptive Target Distance 1.02로 부조건적으로 에러를 증가시면서 하면은 어떻게 될까? 
+    SoftMax기법은 어떠한가?
+    Distance에 Offset을 넣어 보자. Query마다 최대로 가까운 거리가 차이가 있다.
+

@@ -33,7 +33,11 @@ function DistanceRatioCriterion:updateOutput(input, target_dim)
     end
     --self.output = self.MSE:updateOutput(self.SoftMax:updateOutput(input),self.Target)
     local mask = input[{{},target_dim}]:gt(self.MaxTargetValue)
-    self.Target[{{},target_dim}]:maskedCopy(mask, input[{{},target_dim}])
+    self.Target[{{},target_dim}]:maskedCopy(mask, input[{{},target_dim}]*1.02)
+    local saturedmask = input[{{},target_dim}]:gt(1.2)
+    local saturedmask2 = self.Target[{{},target_dim}]:gt(1.2)
+    self.Target[{{},target_dim}]:maskedCopy(saturedmask, input[{{},target_dim}])
+    self.Target[{{},target_dim}]:maskedFill(saturedmask2, 1.2)
     self.output = self.MSE:updateOutput(input,self.Target)
     return self.output
 end
