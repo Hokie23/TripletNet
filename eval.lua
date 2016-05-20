@@ -1,4 +1,4 @@
-local debugger = require 'fb.debugger'
+
 function precision_recall( conf, label )
     local num_correct = 0 -- true positives
     local threshold, index = conf:sort(true)
@@ -9,7 +9,6 @@ function precision_recall( conf, label )
     local precision = torch.zeros(n)
     local ap = 0.0
 
-    --debugger.enter()
     for i = 1,n do
         --compute precision
         num_positive = i        -- true and false positive(selective elements), retrived documents

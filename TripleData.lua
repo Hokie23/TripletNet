@@ -325,7 +325,7 @@ function GenerateListTriplets(db, size, prefix, SampleStage)
             local n3 = math.random( #data.all_negative_list )
             negative_name = data.all_negative_list[n3]
             print ("0", #data.all_negative_list, "n:", negative_name)
-            while negative_name  == anchor_name do
+            while negative_name == anchor_name do
                 n3 = math.random( #data.all_negative_list )
                 negative_name = data.all_negative_list[n3]
                 print("1")

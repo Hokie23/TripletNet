@@ -13,14 +13,14 @@ projectlist = { {project='distance_pair_128_att_0411', linestyle='-'},
         {project='distance_pair_128_0508_forceince', linestyle='-'},
         {project='distance_pair_128_051_ThuMay91240522016_epoch314', linestyle='-'},
         {project='distance_pair_128_0513_ThuMay121020402016_satured_x1.2', linestyle='-'},
-        {project='distance_pair_128_0513_softmax_epoch8', linestyle='-'},
-        {project='distance_pair_128_0513_softmax_FriMay131406142016_epoch20', linestyle='-'},
         {project='distance_pair_128_0513_ThuMay121020402016_epoch389', linestyle='-'},
-        {project='distance_pair_128_0517_satured_FriMay131821252016_epoch523', linestyle='-'},
-        {project='distance_pair_128_0513_softmax_FriMay131406142016_epoch568', linestyle='-'},
-        {project='distance_pair_128_0517_forceinc_MonMay91240522016_epoch475', linestyle='-'},
-        {project='distance_pair_128_0517_satured_FriMay131821252016_epoch380', linestyle='-'},
-        {project='distance_pair_128_0517_satured_FriMay131821252016_epoch492', linestyle='-'}
+        {project='distance_pair_128_0517_satured_FriMay131821252016_epoch492', linestyle='-'},
+        {project='distance_pair_128_0518_saturedx1.2_TueMay1713:10:552016_epoch289', linestyle='-'},
+        {project='distance_pair_128_0519_WedMay1817:55:492016_epoch205', linestyle='-'},
+        {project='distance_pair_128_0519_WedMay1817:07:022016_epoch209', linestyle='-'},
+        {project='distance_pair_128_0519_WedMay1817:09:572016_epoch223', linestyle='-'},
+        {project='distance_pair_128_0519_WedMay1817:55:492016_epoch255', linestyle='-'},
+        {project='distance_pair_128_0519_WedMay1817:09:572016_epoch284', linestyle='-'}
 
     }
 

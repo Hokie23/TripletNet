@@ -9,6 +9,7 @@ require 'trepl'
 require 'DistanceRatioCriterion'
 require 'DistanceRatioSoftMaxCriterion'
 require 'DistancePseudoRatioCriterion'
+require 'DistanceInterClassRatioCriterion'
 require 'PairwiseDistanceOffset'
 require 'TripletEmbeddingCriterion'
 require 'cunn'
@@ -54,10 +55,11 @@ cmd:option('-LR',                 0.001,                    'learning rate')
 cmd:option('-LRDecay',            1e-6,                   'learning rate decay (in # samples)')
 cmd:option('-weightDecay',        1e-4,                   'L2 penalty on the weights')
 cmd:option('-momentum',           0.95,                    'momentum')
-cmd:option('-distance_ratio',           1.0,                    'distance ratio')
+cmd:option('-distance_ratio',           0.001,                    'distance ratio')
 cmd:option('-max_distance_ratio',           1.0,                    'distance ratio')
-cmd:option('-distance_increment',           0.02,                    'distance increment')
+cmd:option('-distance_increment',           0.002,                    'distance increment')
 cmd:option('-increment_policy',          true,                    'distance increment poliy')
+--cmd:option('-increment_policy',          false,                    'distance increment poliy')
 --cmd:option('-distance_ratio',           0.05,                    'distance ratio')
 --cmd:option('-max_distance_ratio',           1.0,                    'distance ratio')
 --cmd:option('-distance_increment',           0.001,                    'distance increment')
@@ -93,7 +95,7 @@ cmd:option('-augment',            true,                  'Augment training data'
 cmd:option('-preProcDir',         './PreProcData/',       'Data for pre-processing (means,P,invP)')
 
 cmd:text('===>Misc')
-cmd:option('-visualize',          true,                  'display first level filters after each epoch')
+cmd:option('-visualize',          false,                  'display first level filters after each epoch')
 
 
 opt = cmd:parse(arg or {})
@@ -131,13 +133,15 @@ EmbeddingNet:cuda()
 local TripletNet = nn.TripletNet(EmbeddingNet)
 --local Loss = nn.DistanceRatioCriterion()
 
-local Loss = nn.DistanceRatioCriterion(distance_ratio)
-local ErrorLoss = nn.DistanceRatioCriterion(distance_ratio)
+--local Loss = nn.DistanceRatioCriterion(distance_ratio)
+--local ErrorLoss = nn.DistanceRatioCriterion(distance_ratio)
 --local Loss = nn.DistanceRatioSoftMaxCriterion()
 --local ErrorLoss = nn.DistanceRatioSoftMaxCriterion()
 --local Loss = nn.TripletEmbeddingCriterion(0.2)
 --local Loss = nn.DistancePseudoRatioCriterion(distance_ratio,1, 0)
 --local ErrorLoss = nn.DistancePseudoRatioCriterion(distance_ratio, 1, 0)
+local Loss = nn.DistanceInterClassRatioCriterion(distance_ratio, 1, 0)
+local ErrorLoss = nn.DistanceInterClassRatioCriterion(distance_ratio, 1, 0)
 
 local Weights, Gradients = TripletNet:getParameters()
 TripletNet:cuda()
@@ -176,6 +180,7 @@ local SizeTest = 6400
 if istest ~= false then
     os.execute('mkdir -p ' .. opt.save)
     os.execute('cp ' .. opt.network .. '.lua ' .. opt.save)
+    os.execute('cp ./*.lua ' .. opt.save)
     cmd:log(opt.save .. '/Log.txt', opt)
 end
 
@@ -432,6 +437,7 @@ function Test(DataC, epoch)
     local num = 0
     local conf = {}
     local label = {}
+
     while true do
         collectgarbage()
         local mylist = DataC:GetNextBatch()
@@ -476,7 +482,6 @@ function Test(DataC, epoch)
                     local y = TripletNet:forward({x[1],x[2],x[3]})
                     local lerr = ErrorCount(y)
 
-                    --debugger.enter()
                     for xx=1,y:size(1) do
                         table.insert(conf, y[xx][1])
                         table.insert(label, -1)
@@ -501,6 +506,8 @@ function Test(DataC, epoch)
     --debugger.enter()
     local confTensor = torch.Tensor(conf):type('torch.DoubleTensor')
     local labelTensor = torch.Tensor(label):type('torch.DoubleTensor')
+    local maxDist = confTensor:max()
+    confTensor = (-confTensor):add(maxDist)/maxDist
     local rec, prec, ap, threshold1 = precision_recall(confTensor, labelTensor)
     return (err/num), rec, prec, ap
 end
@@ -545,7 +552,7 @@ while epoch ~= opt.epoch do
     end
 
     print( string.format('[epoch #%d:%f] Test Error = %f(%f), baselineTrainErr=%f, AP=%f, bestAP=%f', epoch, distance_ratio, ErrTest, ErrTest/distance_ratio, baselineTrainErr, AP, bestAP) )
-    Log:add{['Training Error']= ErrTrain* 100, ['Test Error'] = ErrTest* 100, ['Average Precision'] = AP*100}
+    Log:add{['Training Error']= ErrTrain* 100, ['Test Error'] = ErrTest* 100, ['Average Precision'] = AP*0.001}
     Log:style{['Training Error'] = '-', ['Test Error'] = '-', ['Average Precision'] = '-'}
     Log:plot()
     print ("ploted\n")

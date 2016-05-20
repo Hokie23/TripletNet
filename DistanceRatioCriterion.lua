@@ -31,6 +31,9 @@ function DistanceRatioCriterion:updateOutput(input, target_dim)
     if not self.Target:isSameSizeAs(input) then
         self:createTarget(input, target_dim)
     end
+
+    self.Target[{{},1}] = self.MaxTargetValue
+    self.Target[{{},2}] = 0
     --self.output = self.MSE:updateOutput(self.SoftMax:updateOutput(input),self.Target)
     local mask = input[{{},target_dim}]:gt(self.MaxTargetValue)
     self.Target[{{},target_dim}]:maskedCopy(mask, input[{{},target_dim}]*1.02)
