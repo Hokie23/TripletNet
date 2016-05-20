@@ -545,10 +545,10 @@ while epoch ~= opt.epoch do
         print ("Save Best")
         bestErr = ErrTest
         bestAP = AP
-        torch.save(network_filename .. 'best.embedding.model.t7', lightmodel)
-        torch.save(network_filename .. 'best.tripletnet.t7', TripletNet)
-        torch.save(weights_filename .. 'best.tripletnet.w.t7', tw)
-        torch.save(weights_filename .. 'best.optim.w.t7', optimizer.Parameters[1])
+        --torch.save(network_filename .. 'best.embedding.model.t7', lightmodel)
+        --torch.save(network_filename .. 'best.tripletnet.t7', TripletNet)
+        --torch.save(weights_filename .. 'best.tripletnet.w.t7', tw)
+        --torch.save(weights_filename .. 'best.optim.w.t7', optimizer.Parameters[1])
     end
 
     print( string.format('[epoch #%d:%f] Test Error = %f(%f), baselineTrainErr=%f, AP=%f, bestAP=%f', epoch, distance_ratio, ErrTest, ErrTest/distance_ratio, baselineTrainErr, AP, bestAP) )

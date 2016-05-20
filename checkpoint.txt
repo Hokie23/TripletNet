@@ -70,4 +70,5 @@
     SoftMax기법은 어떠한가?
     Distance에 Offset을 넣어 보자. Query마다 최대로 가까운 거리가 차이가 있다.
 2016.5.18. Output Distanc vs adaptive distance의 실험 결과 체크
+    Fashion에서는 여성 구두가 약한데, 왜 그럴까? 샘플이 적은 것일 까?
 
