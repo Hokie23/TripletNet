@@ -67,8 +67,11 @@
     1.0으로 고정시켜놓고 threshold value보다 작은 것을 target으로 맞추는 과정은 성능이 떨어 졌다.
     Output Distance를 서서히 올리면서 학습하는 것이 좋은 성능을 가졌다. 고정보다 서서히 올리는 것이 성능이 좋게 나왔다.
     Adaptive Target Distance 1.02로 부조건적으로 에러를 증가시면서 하면은 어떻게 될까? 
-    SoftMax기법은 어떠한가?
+    SoftMax기법은 어떠한가? ==> 성능이 떨어 지더라
     Distance에 Offset을 넣어 보자. Query마다 최대로 가까운 거리가 차이가 있다.
 2016.5.18. Output Distanc vs adaptive distance의 실험 결과 체크
     Fashion에서는 여성 구두가 약한데, 왜 그럴까? 샘플이 적은 것일 까?
+
+    * Target을 1.02배로 한것이 수렴에는 불안해도 훨씬 성능이 좋게 나타났다. 이것의 특징은 가까운 0은 무조건 맞추도록 한다. negative 샘플에 한하여 1.2배를 한것이 특징이다.
+    * Output Distanc vs adaptive distance의 실험 결과 체크 => selection sample기법이기는 하나, 가까운 0부분에서는 precision이 떨어지는 현상이 발견
 

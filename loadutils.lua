@@ -98,21 +98,21 @@ function loadutils:LoadPairs(filepath, check_imagefile, first_index)
 
     for i=1,#label_pairs do
         m = label_pairs[i]
-        local a_name = m[1]
-        local t_name = m[2]
-        local p_or_n = m[3]
+        local a_name = m[first_index+0]
+        local t_name = m[first_index+1]
+        local p_or_n = m[first_index+2]
 
         local cond_var = (function() 
             -- loop body
             if check_image then
                 if imagepoolbyname[a_name] == nil then
-                    if loadutils:CheckImage(a_name) == false then
+                    if self:CheckImage(a_name) == false then
                         return 
                     end
                     imagepoolbyname[a_name] = true
                 end
                 if imagepoolbyname[t_name] == nil then
-                    if loadutils:CheckImage(t_name) == false then
+                    if self:CheckImage(t_name) == false then
                         return 
                     end
                     imagepoolbyname[t_name] = true

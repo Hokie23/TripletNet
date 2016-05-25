@@ -280,7 +280,7 @@ function SelectListTripletsSimple(db, size, TensorType, SampleStage)
 
         --current = current + 1
         --current = current + 100
-        current = current + 5
+        current = current + 20
         if current > #data.anchor_name_list then
             isend = true
             current = 1
@@ -299,7 +299,7 @@ function GenerateListTriplets(db, size, prefix, SampleStage)
     local list = {}
     local nClasses = #data.anchor_name_list 
     --for i=1, size, 100 do
-    for i=1, size, 5 do
+    for i=1, size, 20 do
     --for i=1, size do
         print ("generate list #" .. i .. "/#" .. size)
         local c1, anchor_name, positive_name, negative_name

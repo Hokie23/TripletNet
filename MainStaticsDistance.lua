@@ -1,4 +1,3 @@
-require ('mobdebug').start()
 require "csvigo"
 require 'cutorch'
 require 'cunn'
@@ -54,6 +53,9 @@ cmd:option('-output', 'distance_pair.csv', 'save directory')
 
 cmd:text('===>Data Options')
 cmd:option('-imagePath','/data1/october_11st/october_11st_imgs/', 'image path directory')
+cmd:option('-testpairs','fashion_pair_test.csv', 'fashion test pairs filepath')
+cmd:option('-firstitem', 1, 'first item')
+cmd:option('-checkjpgfile', false, 'first item')
 
 opt = cmd:parse(arg or {})
 torch.setdefaulttensortype('torch.FloatTensor')
@@ -63,6 +65,8 @@ cutorch.setDevice(opt.devid)
 opt.network = opt.modelsFolder .. opt.network 
 opt.save = paths.concat('./StaticsResults', opt.save)
 output_filename = opt.output
+
+print ("image path", opt.imagePath)
 
 lu = loadutils({opt.imagePath})
 
@@ -98,16 +102,18 @@ os.execute('mkdir -p ' .. opt.save)
 cmd:log(opt.save .. '/Log.txt', opt)
 ----------------------------------------------------------------------
 
-local fashion_test_pair = 'fashion_pair_test.csv'
+--local fashion_test_pair = 'fashion_pair_test.csv'
+--local fashion_test_pair = 'shoes_pair.valid.csv'
 --local fashion_test_pair = 'fashion_pair_valid.csv'
 --local fashion_test_pair = 'fashion_pair_train.csv'
+local fashion_test_pair = opt.testpairs
 
 print ('load pairs', fashion_test_pair)
 local Resolution = lu:Resolution()
 print ("Resolution", Resolution)
 
 
-local test_pairs = lu:LoadPairs( fashion_test_pair)
+local test_pairs = lu:LoadPairs( fashion_test_pair, opt.checkjpgfile, opt.firstitem)
 print ('#loaded pairs:', #test_pairs)
 
 local outputs = {}

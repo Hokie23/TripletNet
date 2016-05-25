@@ -57,8 +57,8 @@ cmd:option('-weightDecay',        1e-4,                   'L2 penalty on the wei
 cmd:option('-momentum',           0.95,                    'momentum')
 cmd:option('-distance_ratio',           0.001,                    'distance ratio')
 cmd:option('-max_distance_ratio',           1.0,                    'distance ratio')
-cmd:option('-distance_increment',           0.002,                    'distance increment')
-cmd:option('-increment_policy',          true,                    'distance increment poliy')
+cmd:option('-distance_increment',           0.0002,                    'distance increment')
+cmd:option('-increment_policy',          false,                    'distance increment poliy')
 --cmd:option('-increment_policy',          false,                    'distance increment poliy')
 --cmd:option('-distance_ratio',           0.05,                    'distance ratio')
 --cmd:option('-max_distance_ratio',           1.0,                    'distance ratio')
@@ -91,7 +91,7 @@ cmd:option('-size',               12,                 'size of training list' )
 --cmd:option('-size',               64000,                 'size of training list' )
 --cmd:option('-normalize',          1,                      '1 - normalize using only 1 mean and std values')
 cmd:option('-whiten',             false,                  'whiten data')
-cmd:option('-augment',            true,                  'Augment training data')
+cmd:option('-disable_augment',            false,                  'Augment training data')
 cmd:option('-preProcDir',         './PreProcData/',       'Data for pre-processing (means,P,invP)')
 
 cmd:text('===>Misc')
@@ -147,6 +147,7 @@ local Weights, Gradients = TripletNet:getParameters()
 TripletNet:cuda()
 Loss:cuda()
 ErrorLoss:cuda()
+ErrorLoss:training()
 
 
 first_weight = {Weights[1]}
@@ -528,12 +529,12 @@ while epoch ~= opt.epoch do
     EmbeddingNet:clearState()
     TripletNet:clearState()
 
-    local lightmodel = TripletNet.nets[1]:clone('weight', 'bias', 'running_mean', 'running_std', 'running_var')
-    local tw, tgradp = TripletNet:parameters()
+    --local lightmodel = TripletNet.nets[1]:clone('weight', 'bias', 'running_mean', 'running_std', 'running_var')
+    --local tw, tgradp = TripletNet:parameters()
 
     --optimizer.Parameters = {tw, tgradp},
 
-    torch.save(network_filename .. 'tripletnet.t7' .. epoch, lightmodel)
+    --torch.save(network_filename .. 'tripletnet.t7' .. epoch, lightmodel)
     --torch.save(weights_filename .. 'optim.w.t7' .. epoch, optimizer.Parameters[1])
     --torch.save(weights_filename .. epoch, tw)
     --torch.save(weights_filename .. 'tripletnet.t7' .. epoch, TripletNet)
@@ -542,10 +543,11 @@ while epoch ~= opt.epoch do
     local ErrTest, rec, prec, AP = Test(TestDataContainer, epoch)
     --if bestErr > ErrTest then
     if bestAP < AP  then
+        local lightmodel = TripletNet.nets[1]:clone('weight', 'bias', 'running_mean', 'running_std', 'running_var')
         print ("Save Best")
         bestErr = ErrTest
         bestAP = AP
-        --torch.save(network_filename .. 'best.embedding.model.t7', lightmodel)
+        torch.save(network_filename .. 'best.embedding.model.t7' .. epoch, lightmodel)
         --torch.save(network_filename .. 'best.tripletnet.t7', TripletNet)
         --torch.save(weights_filename .. 'best.tripletnet.w.t7', tw)
         --torch.save(weights_filename .. 'best.optim.w.t7', optimizer.Parameters[1])

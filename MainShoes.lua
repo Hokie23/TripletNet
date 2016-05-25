@@ -7,11 +7,16 @@ require 'optim'
 require 'xlua'
 require 'trepl'
 require 'DistanceRatioCriterion'
+require 'DistanceRatioSoftMaxCriterion'
+require 'DistancePseudoRatioCriterion'
+require 'DistanceInterClassRatioCriterion'
 require 'PairwiseDistanceOffset'
 require 'TripletEmbeddingCriterion'
 require 'cunn'
 require 'WorkerParam'
 require 'cudnn'
+metrics = require 'metrics'
+require 'eval'
 --local async = require('async')
 
 --async.repl()
@@ -53,6 +58,7 @@ cmd:option('-momentum',           0.95,                    'momentum')
 cmd:option('-distance_ratio',           0.2,                    'distance ratio')
 cmd:option('-max_distance_ratio',           1.0,                    'distance ratio')
 cmd:option('-distance_increment',           0.001,                    'distance increment')
+cmd:option('-increment_policy',          true,                    'distance increment poliy')
 --cmd:option('-distance_ratio',           0.05,                    'distance ratio')
 --cmd:option('-max_distance_ratio',           1.0,                    'distance ratio')
 --cmd:option('-distance_increment',           0.001,                    'distance increment')
@@ -88,10 +94,11 @@ cmd:option('-augment',            true,                  'Augment training data'
 cmd:option('-preProcDir',         './PreProcData/',       'Data for pre-processing (means,P,invP)')
 
 cmd:text('===>Misc')
-cmd:option('-visualize',          true,                  'display first level filters after each epoch')
+cmd:option('-visualize',          false,                  'display first level filters after each epoch')
 
 
 opt = cmd:parse(arg or {})
+increment_policy = opt.increment_policy or false
 distance_ratio = opt.distance_ratio
 max_distance_ratio = opt.max_distance_ratio
 distance_increment = opt.distance_increment
@@ -125,9 +132,11 @@ EmbeddingNet:cuda()
 local TripletNet = nn.TripletNet(EmbeddingNet)
 --local Loss = nn.DistanceRatioCriterion()
 
-local Loss = nn.DistanceRatioCriterion(distance_ratio)
-local ErrorLoss = nn.DistanceRatioCriterion(distance_ratio)
+--local Loss = nn.DistanceRatioCriterion(distance_ratio)
+--local ErrorLoss = nn.DistanceRatioCriterion(distance_ratio)
 --local Loss = nn.TripletEmbeddingCriterion(0.2)
+local Loss = nn.DistanceInterClassRatioCriterion(distance_ratio, 1, 0)
+local ErrorLoss = nn.DistanceInterClassRatioCriterion(distance_ratio, 1, 0)
 
 local Weights, Gradients = TripletNet:getParameters()
 TripletNet:cuda()
@@ -166,6 +175,7 @@ local SizeTest = 6400
 if istest ~= false then
     os.execute('mkdir -p ' .. opt.save)
     os.execute('cp ' .. opt.network .. '.lua ' .. opt.save)
+    os.execute('cp ./*.lua ' .. opt.save)
     cmd:log(opt.save .. '/Log.txt', opt)
 end
 
@@ -294,6 +304,11 @@ local thread_pool = threads.Threads( nthread, function(idx)
                 end)
 
 print ("-------261") 
+local bestTrainErr = 999999
+local baselineTrainErr = 0
+local bestAP = 0
+
+
 function Train(DataC, epoch)
     print ("RunTrain")
     local err = 0
@@ -380,7 +395,7 @@ function Train(DataC, epoch)
                         --print("y:", y)
 
                         -- print( "lerr: ", lerr*100.0/y[1]:size(1) )
-                        print( string.format("[epoch:%d, mdist=%f]: Train lerr: %f(%f)", epoch, distance_ratio, lerr, lerr/distance_ratio ) )
+                        print( string.format("[epoch:%d, mdist=%f]: Train lerr: %f(%f), best=%f, baseline=%f", epoch, distance_ratio, lerr, lerr/distance_ratio, bestTrainErr, baselineTrainErr ) )
 
                         err = err + lerr
                         xlua.progress(TrainSampleStage.current, TrainSampleStage.total_size )
@@ -415,6 +430,9 @@ function Test(DataC, epoch)
     TripletNet:evaluate()
     local err = 0
     local num = 0
+    local conf = {}
+    local label = {}
+
     while true do
         collectgarbage()
         local mylist = DataC:GetNextBatch()
@@ -458,8 +476,15 @@ function Test(DataC, epoch)
                     --local y = TripletNet:forward({x[1],x[2],x[3]})
                     local y = TripletNet:forward({x[1],x[2],x[3]})
                     local lerr = ErrorCount(y)
+
+                    for xx=1,y:size(1) do
+                        table.insert(conf, y[xx][1])
+                        table.insert(label, -1)
+                        table.insert(conf, y[xx][2])
+                        table.insert(label, 1)
+                    end
                     --print( "Test lerr: ", lerr*100.0/y[1]:size(1) )
-                    print( string.format("[epoch:%d, mdist=%f]: Test lerr: %f(%f)", epoch, distance_ratio, lerr, lerr/distance_ratio ) )
+                    print( string.format("[epoch:%d, mdist=%f]: Test lerr: %f(%f), baselineTrainErr=%f", epoch, distance_ratio, lerr, lerr/distance_ratio, baselineTrainErr ) )
                     err = err + lerr
                     xlua.progress(num*DataC.BatchSize, DataC:size())
                     num = num +1
@@ -470,17 +495,24 @@ function Test(DataC, epoch)
     end
     thread_pool:synchronize()
     if num == 0 then
-        return 0
+        return 0, 0, 0, 0
     end
-    return (err/num)
+
+    local confTensor = torch.Tensor(conf):type('torch.DoubleTensor')
+    local labelTensor = torch.Tensor(label):type('torch.DoubleTensor')
+    local maxDist = confTensor:max()
+    confTensor = (-confTensor):add(maxDist)/maxDist
+    local rec, prec, ap, threshold1 = precision_recall(confTensor, labelTensor)
+    return (err/num), rec, prec, ap
 end
 
 
 print ("-----436")
 local bestErr = 10000
-local bestTrainErr = 10000
 local epoch = 1
-local baselineTrainErr = 1000
+local subepoch = 1
+local baselineTrainErrList = {}
+local baselineTrainDelta = 0
 print '\n==> Starting Training\n'
 while epoch ~= opt.epoch do
     print('Epoch ' .. epoch)
@@ -496,22 +528,20 @@ while epoch ~= opt.epoch do
     --optimizer.Parameters = {tw, tgradp},
 
     torch.save(network_filename .. 'tripletnet.t7' .. epoch, lightmodel)
-    torch.save(weights_filename .. 'optim.w.t7' .. epoch, optimizer.Parameters[1])
+    --torch.save(weights_filename .. 'optim.w.t7' .. epoch, optimizer.Parameters[1])
     --torch.save(weights_filename .. epoch, tw)
     --torch.save(weights_filename .. 'tripletnet.t7' .. epoch, TripletNet)
-    print( string.format('[epoch #%d:%f]:%s Training Error = %f(%f)', epoch, distance_ratio, opt.save, ErrTrain, ErrTrain/distance_ratio) )
-    local ErrTest = Test(TestDataContainer, epoch)
-    if bestErr > ErrTest then
+    print( string.format('[epoch #%d:%f]:%s Training Error = %f(%f), bestTrainErr=%f, baselineTrainErr=%f', epoch, distance_ratio, opt.save, ErrTrain, ErrTrain/distance_ratio, bestTrainErr, baselineTrainErr) )
+
+    local ErrTest, rec, prec, AP = Test(TestDataContainer, epoch)
+    if bestAP < AP  then
         print ("Save Best")
         bestErr = ErrTest
-        torch.save(network_filename .. 'best.embedding.model.t7', lightmodel)
-        torch.save(network_filename .. 'best.tripletnet.t7', TripletNet)
-        torch.save(weights_filename .. 'best.tripletnet.w.t7', tw)
-        torch.save(weights_filename .. 'best.optim.w.t7', optimizer.Parameters[1])
+        bestAP = AP
     end
 
-    print( string.format('[epoch #%d:%f] Test Error = %f(%f)', epoch, distance_ratio, ErrTest, ErrTest/distance_ratio) )
-    Log:add{['Training Error']= ErrTrain* 100, ['Test Error'] = ErrTest* 100}
+    print( string.format('[epoch #%d:%f] Test Error = %f(%f), baselineTrainErr=%f, AP=%f, bestAP=%f', epoch, distance_ratio, ErrTest, ErrTest/distance_ratio, baselineTrainErr, AP, bestAP) )
+    Log:add{['Training Error']= ErrTrain* 100, ['Test Error'] = ErrTest* 100, ['Average Precision'] = AP*0.001}
     Log:style{['Training Error'] = '-', ['Test Error'] = '-'}
     Log:plot()
     print ("ploted\n")
@@ -524,21 +554,40 @@ while epoch ~= opt.epoch do
     end
 
 
-    epoch = epoch+1
-
-    if epoch == 1 then
-        baselineTrainErr = ErrTrain*0.01
-    else
-        if baselineTrainErr*1.005 >= ErrTrain then
-            distance_ratio = distance_ratio + distance_increment*(max_distance_ratio - distance_ratio)
-            if distance_ratio > max_distance_ratio then
-                distance_ratio = max_distance_ratio
-            end
-            Loss:ResetTargetValue(distance_ratio, 1)
-            ErrorLoss:ResetTargetValue(distance_ratio, 1)
+    if increment_policy then
+        baselineTrainErr = ErrTrain
+        bestTrainErr = baselineTrainErr
+        baselineTrainStd = 1
+        distance_ratio = distance_ratio + distance_increment
+        if distance_ratio > max_distance_ratio then
+            distance_ratio = max_distance_ratio
         end
-        baselineTrainErr = baselineTrainErr + 0.95*(ErrTrain - baselineTrainErr)
+    else
+        if epoch == 1 then
+            baselineTrainErr = ErrTrain
+            bestTrainErr = baselineTrainErr
+            baselineTrainStd = 1
+        else
+            baselineTrainDelta = ErrTrain - baselineTrainErr
+            baselineTrainErr = baselineTrainErr + 0.95*baselineTrainDelta
+            if bestTrainErr > baselineTrainErr then
+                bestTrainErr = baselineTrainErr
+            else
+                if bestTrainErr * 1.01 >= baselineTrainErr or math.abs(baselineTrainDelta)/baselineTrainErr < 0.012 then
+                    distance_ratio = distance_ratio + distance_increment*(max_distance_ratio - distance_ratio)
+                    if distance_ratio > max_distance_ratio then
+                        distance_ratio = max_distance_ratio
+                    end
+                    Loss:ResetTargetValue(distance_ratio, 1)
+                    ErrorLoss:ResetTargetValue(distance_ratio, 1)
+                    subepoch = 0
+                    bestTrainErr = bestTrainErr + 0.95*(baselineTrainErr - bestTrainErr)
+                end
+            end
+        end
     end
+    epoch = epoch+1
+    subepoch = subepoch + 1
 end
 
 print ("End Training\n")
