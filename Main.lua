@@ -147,7 +147,10 @@ local Weights, Gradients = TripletNet:getParameters()
 TripletNet:cuda()
 Loss:cuda()
 ErrorLoss:cuda()
-ErrorLoss:training()
+result, err = pcall(ErrorLoss:training())
+if result == false then
+    print ("ErrorLoss:tranining call:", err)
+end
 
 
 first_weight = {Weights[1]}
