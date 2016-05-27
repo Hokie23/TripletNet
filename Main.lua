@@ -15,7 +15,6 @@ require 'TripletEmbeddingCriterion'
 require 'cunn'
 require 'WorkerParam'
 require 'cudnn'
-metrics = require 'metrics'
 require 'eval'
 --local async = require('async')
 
