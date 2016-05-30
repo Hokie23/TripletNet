@@ -523,6 +523,11 @@ local subepoch = 1
 local baselineTrainErrList = {}
 local baselineTrainDelta = 0
 print '\n==> Starting Training\n'
+
+local ErrTest, rec, prec, AP = Test(TestDataContainer, 0)
+print( string.format('[epoch #%d:%f] Test Error = %f(%f), baselineTrainErr=%f, AP=%f, bestAP=%f', 0, distance_ratio, ErrTest, ErrTest/distance_ratio, baselineTrainErr, AP, bestAP) )
+bestAP = AP
+
 while epoch ~= opt.epoch do
     print('Epoch ' .. epoch)
     local ErrTrain = Train(TrainDataContainer, epoch)
