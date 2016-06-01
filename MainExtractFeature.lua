@@ -26,12 +26,13 @@ cmd:option('-model', '', 'model file name')
 cmd:option('-weight', '', 'weight file name')
 cmd:option('-batchSize',          32,                    'batch size')
 cmd:option('-cache', true, 'cache batch list')
+cmd:option('-category', 'all', 'extract category')
 
 opt = cmd:parse(arg or {})
 
 torch.setdefaulttensortype('torch.FloatTensor')
 
-
+local target_category = opt.category
 local batchSize = opt.batchSize
 local batch_list = opt.batch_list or error("must be batch_list")
 local output_list = opt.output_list
@@ -80,8 +81,10 @@ local replacePath = "/data1/october_11st/october_11st_imgs/"
 for i=1,#batch_items do
     local content_id, mid_category, category_name, imagepath = unpack(batch_items[i])
     local cond = (function() 
-            if category_name ~= 'shoes' then
-                return "stop/category"
+            if target_category ~= 'all' then
+                if category_name ~= target_category then
+                    return "stop/category"
+                end 
             end
             imagepath = imagepath:gsub("/userdata2/index_11st_20151020/october_11st_imgdata/",replacePath )
             local img = lu:LoadNormalizedResolutionImageCenterCrop(imagepath)
