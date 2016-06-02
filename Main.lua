@@ -10,6 +10,7 @@ require 'DistanceRatioCriterion'
 require 'DistanceRatioSoftMaxCriterion'
 require 'DistancePseudoRatioCriterion'
 require 'DistanceInterClassRatioCriterion'
+require 'DistanceInterClassBiasedRatioCriterion'
 require 'PairwiseDistanceOffset'
 require 'TripletEmbeddingCriterion'
 require 'cunn'
@@ -49,7 +50,8 @@ cmd:option('-modelsFolder',       './Models/',            'Models Folder')
 --cmd:option('-network',            'resception_135_grid.lua',            'embedding network file - must return valid network.')
 --cmd:option('-network',            'layerdrop_135_grid.lua',            'embedding network file - must return valid network.')
 --cmd:option('-network',            'attention_128_offset.lua',            'embedding network file - must return valid network.')
-cmd:option('-network',            'attention_128_grid.lua',            'embedding network file - must return valid network.')
+--cmd:option('-network',            'attention_128_grid.lua',            'embedding network file - must return valid network.')
+cmd:option('-network',            'attention_128_grid_bias.lua',            'embedding network file - must return valid network.')
 cmd:option('-LR',                 0.001,                    'learning rate')
 cmd:option('-LRDecay',            1e-6,                   'learning rate decay (in # samples)')
 cmd:option('-weightDecay',        1e-4,                   'L2 penalty on the weights')
@@ -139,16 +141,19 @@ local TripletNet = nn.TripletNet(EmbeddingNet)
 --local Loss = nn.TripletEmbeddingCriterion(0.2)
 --local Loss = nn.DistancePseudoRatioCriterion(distance_ratio,1, 0)
 --local ErrorLoss = nn.DistancePseudoRatioCriterion(distance_ratio, 1, 0)
-local Loss = nn.DistanceInterClassRatioCriterion(distance_ratio, 1, 0)
-local ErrorLoss = nn.DistanceInterClassRatioCriterion(distance_ratio, 1, 0)
+--local Loss = nn.DistanceInterClassRatioCriterion(distance_ratio, 1, 0)
+--local ErrorLoss = nn.DistanceInterClassRatioCriterion(distance_ratio, 1, 0)
+local Loss = nn.DistanceInterClassBiasedRatioCriterion(distance_ratio, 1, 0)
+local ErrorLoss = nn.DistanceInterClassBiasedRatioCriterion(distance_ratio, 1, 0)
 
 local Weights, Gradients = TripletNet:getParameters()
 TripletNet:cuda()
 Loss:cuda()
 ErrorLoss:cuda()
-result, err = pcall(ErrorLoss:training())
+
+result, err = pcall(ErrorLoss:evaluate())
 if result == false then
-    print ("ErrorLoss:tranining call:", err)
+    print ("ErrorLoss:evaluate call:", err)
 end
 
 
@@ -261,7 +266,7 @@ local function ErrorCount(y)
     --local neg_loss = -(y[1]-1.0)
     --local loss = y[2]:mean() + neg_loss:mean()
     --return loss*0.5
-
+    --
     return ErrorLoss:forward(y,1)
 
 end
@@ -482,6 +487,8 @@ function Test(DataC, epoch)
                         return
                     end
                     --local y = TripletNet:forward({x[1],x[2],x[3]})
+                    --local m = TripletNet.nets[1]
+                    --print (m:get( #(m.modules) ).output)
                     local y = TripletNet:forward({x[1],x[2],x[3]})
                     local lerr = ErrorCount(y)
 

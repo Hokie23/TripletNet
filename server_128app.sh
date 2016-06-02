@@ -7,5 +7,6 @@
 #CUDA_VISIBLE_DEVICES=0 th MainLoadFeature.lua -feature_list ./result_128D_shoes.out -model './Results/TueApr2620:13:122016/tripletnet.best.t7.epoch102' 
 #CUDA_VISIBLE_DEVICES=0 th MainLoadFeature.lua -feature_list ./result_128D_fashion.out -model './Results/MonMay912:40:522016/Embedding.t7tripletnet.t7166' 
 #CUDA_VISIBLE_DEVICES=0 th MainLoadFeature.lua -feature_list ./result_128D_fashion.out -model './Results/WedMay1817:09:572016/Embedding.t7tripletnet.t7284' 
-CUDA_VISIBLE_DEVICES=0 th MainLoadFeature.lua -feature_list ./result_128D_shoes.out -model './Results/FriMay2013:13:532016/Embedding.t7tripletnet.t736' 
+#CUDA_VISIBLE_DEVICES=0 th MainLoadFeature.lua -feature_list ./result_128D_shoes.out -model './Results/FriMay2013:13:532016/Embedding.t7tripletnet.t736' 
+CUDA_VISIBLE_DEVICES=3 th MainLoadFeature.lua -feature_list ./result_128D_fashion.out -model './Results/MonMay3009:57:142016/Embedding.t7best.embedding.model.t7397' 
 #CUDA_VISIBLE_DEVICES=3 th MainLoadFeature.lua -feature_list ./result_128D_shoes.out -model './Results/ThuApr2115:34:432016/Embedding.t7best.embedding.model.t7' 
