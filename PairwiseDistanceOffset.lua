@@ -28,16 +28,12 @@ function PairwiseDistanceOffset:updateOutput(inputset)
     return self.gModule:updateOutput(inputset)
 end
 
-local function mathsign(x) 
-   if x==0 then return  2*torch.random(2)-3; end
-   if x>0 then return 1; else return -1; end
-end
-
 function PairwiseDistanceOffset:updateGradInput(inputset, gradOutput)
     return self.gModule:updateGradInput(inputset,gradOutput)
 end
 
 function PairwiseDistanceOffset:clearState()
    nn.utils.clear(self, 'diff', 'outExpand', 'grad', 'ones')
+   self.gModule.clearState()
    return parent.clearState(self)
 end
