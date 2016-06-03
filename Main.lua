@@ -1,6 +1,7 @@
 require 'DataContainer'
 require 'TripletNet2'
 require 'TripletNet'
+require 'TripletNetBias'
 require 'cutorch'
 require 'eladtools'
 require 'optim'
@@ -131,7 +132,8 @@ local EmbeddingNet = require(opt.network)
 EmbeddingNet:cuda()
 --local TripletNet = nn.TripletNet2(EmbeddingNet)
 --local TripletNet = nn.TripletNet(EmbeddingNet,nn.PairwiseDistanceOffset(2) )
-local TripletNet = nn.TripletNet(EmbeddingNet)
+--local TripletNet = nn.TripletNet(EmbeddingNet)
+local TripletNet = nn.TripletNetBias(EmbeddingNet)
 --local Loss = nn.DistanceRatioCriterion()
 
 --local Loss = nn.DistanceRatioCriterion(distance_ratio)
@@ -341,6 +343,8 @@ function Train(DataC, epoch)
         DataC:GenerateList(EmbeddingNet)
         EmbeddingNet:training()
         TripletNet:training()
+        pcall(ErrorLoss:training())
+        pcall(Loss:training())
 
         while true do
             collectgarbage()
@@ -440,6 +444,8 @@ function Test(DataC, epoch)
     print ("RunTest")
     thread_pool:synchronize()
     DataC:Reset()
+    pcall(ErrorLoss:evaluate())
+    pcall(Loss:evaluate())
     TripletNet:evaluate()
     local err = 0
     local num = 0
@@ -531,10 +537,10 @@ local baselineTrainErrList = {}
 local baselineTrainDelta = 0
 print '\n==> Starting Training\n'
 
-local ErrTest, rec, prec, AP = Test(TestDataContainer, 0)
-print( string.format('[epoch #%d:%f] Test Error = %f(%f), baselineTrainErr=%f, AP=%f, bestAP=%f', 0, distance_ratio, ErrTest, ErrTest/distance_ratio, baselineTrainErr, AP, bestAP) )
-bestAP = AP
-bestErr = ErrTest
+--local ErrTest, rec, prec, AP = Test(TestDataContainer, 0)
+--print( string.format('[epoch #%d:%f] Test Error = %f(%f), baselineTrainErr=%f, AP=%f, bestAP=%f', 0, distance_ratio, ErrTest, ErrTest/distance_ratio, baselineTrainErr, AP, bestAP) )
+--bestAP = AP
+--bestErr = ErrTest
 
 while epoch ~= opt.epoch do
     print('Epoch ' .. epoch)
