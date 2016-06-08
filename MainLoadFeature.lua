@@ -158,6 +158,7 @@ function distance_from_pool(X)
     end
 
     print( "pool:", feature_pool:size(1))
+    print( "brute-force-search....")
     local mind = 9999
     local max_images = math.min(count, feature_pool:size(1))
     for i=1,max_images,compare_batch do
