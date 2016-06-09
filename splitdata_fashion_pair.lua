@@ -36,6 +36,7 @@ function LoadData(filepath)
     local anchor_name_to_idx = {}
     local anchor_name_list = {}
     local anchor_count = 0
+    local category_name = {}
     local ImagePool = {}
     local count_imagepool = 0
     local ImagePoolByName = {}
@@ -44,14 +45,16 @@ function LoadData(filepath)
     for i=1,#label_pairs do
     --for i=1,#label_pairs,1000 do
         m = label_pairs[i]
+        local category = m[1]
         local a_name = m[2]
         local t_name = m[3]
         local p_or_n = m[4]
         local bcontinue = false
 
-        bcontinue = false
-
-        if a_name ~= t_name and a_name ~= nil then
+        local bstop = (function() 
+            if a_name == t_name or a_name == nil then
+                return "incorrect"
+            end
             --print ("anchor_name=", a_name)
             if ImagePoolByName[a_name] == nil then
                 local img = LoadNormalizedResolutionImage(a_name)
@@ -59,8 +62,7 @@ function LoadData(filepath)
                     count_imagepool = count_imagepool + 1
                     ImagePoolByName[a_name] = true
                 else
-                    --print("ancnor continue")
-                    bcontinue = true
+                    return "non-color"
                 end
             end
             if ImagePoolByName[t_name] == nil then
@@ -69,36 +71,30 @@ function LoadData(filepath)
                     count_imagepool = count_imagepool + 1
                     ImagePoolByName[t_name] = true
                 else
-                    --print("positive continue")
-                    bcontinue = true
+                    return "non-color"
                 end
             end
 
-            if bcontinue == false then
-                if anchor_name_to_idx[a_name] == nil then
-                    table.insert(anchor_name_list, a_name)
-                    anchor_count = anchor_count + 1
-                    anchor_name_to_idx[a_name] = anchor_count
-                end
-                if p_or_n == '1' then
-                    if positive_pairs[a_name] == nil then
-                        positive_pairs[a_name] = {t_name}
-                    else
-                        table.insert(positive_pairs[a_name], t_name )
-                    end
-                else 
-                    if negative_pairs[a_name] == nil then
-                        negative_pairs[a_name] = {t_name}
-                    else
-                        table.insert(negative_pairs[a_name], t_name )
-                    end
-                end
-                --print ("positive_pair", #positive_pairs)
-                --print ("negative_pair", #negative_pairs)
-            else
-                print ("continue")
+            if anchor_name_to_idx[a_name] == nil then
+                table.insert(anchor_name_list, a_name)
+                anchor_count = anchor_count + 1
+                anchor_name_to_idx[a_name] = anchor_count
             end
-        end
+            if p_or_n == '1' then
+                if positive_pairs[a_name] == nil then
+                    positive_pairs[a_name] = {{t_name, category_name}}
+                else
+                    table.insert(positive_pairs[a_name], {t_name, category_name} )
+                end
+            else 
+                if negative_pairs[a_name] == nil then
+                    negative_pairs[a_name] = {{t_name, category_name}}
+                else
+                    table.insert(negative_pairs[a_name], {t_name, category_name} )
+                end
+            end
+            return "ok"
+        end)()
         print (i, #label_pairs, 100.0*(i/#label_pairs), count_imagepool, "anchor", #anchor_name_list)
     end
 
@@ -173,14 +169,14 @@ function write_csv(Data, path)
         local anchor_name = Data.data.anchor_name_list[i]
         local pos_of_anchor = Data.data.positive[anchor_name]
         for j=1,#pos_of_anchor do
-            local pair = {anchor_name, pos_of_anchor[j], 1}
+            local pair = {pos_of_anchor[j][2], anchor_name, pos_of_anchor[j][1], 1}
             table.insert(array, pair)
         end
 
         local neg_of_anchor = Data.data.negative[anchor_name]
         if neg_of_anchor ~= nil then
             for j=1,#neg_of_anchor do
-                local pair = {anchor_name, neg_of_anchor[j], 0}
+                local pair = {neg_of_anchor[j][2], anchor_name, neg_of_anchor[j], 0}
                 table.insert(array, pair)
             end
         end

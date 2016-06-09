@@ -1,25 +1,37 @@
 #-*- coding: utf-8 -*-
 import random
 
-#filename = 'fashion_pair.csv'
-#filename = 'shoes_pair.train.csv'
-filename = 'shoes_pair.valid.csv'
-outfilename = './html/IR/shoes_pair_lists.valid.html'
-#image_baseurl = "http://175.126.56.112/october_11st/"
-image_baseurl = "http://10.202.35.87/freebee/"
+#filename = 'fashion_pair_valid.csv'; format_type = 4
+filename = 'fashion_pair_valid.csv'; format_type = 3
+#filename = 'shoes_pair.train.csv'; format_type = 4
+#filename = 'shoes_pair.valid.csv'; format_type = 4
+#outfilename = './html/IR/shoes_pair_lists.valid.html'
+outfilename = './html/IR/fashion_pair_lists.valid.html'
+image_baseurl = "http://175.126.56.112/october_11st/"
+#image_baseurl = "http://10.202.35.87/freebee/"
 f = open(filename, 'rt')
 
 meta = dict()
+
 
 count = 0
 for line in f.readlines():
     line = line.rstrip()
     items = line.split(",")
-    if len(items) < 4:
-        continue
-    anchor = items[1]
-    pair = items[2]
-    p_or_n = items[3]
+
+    if format_type == 4:
+        if len(items) < 4:
+            continue
+        anchor = items[1]
+        pair = items[2]
+        p_or_n = items[3]
+    elif format_type == 3:
+        if len(items) < 3:
+            continue
+        anchor = items[0]
+        pair = items[1]
+        p_or_n = items[2]
+
     if not anchor in meta:
         meta[anchor] = {"P":[], "N":[]}
     if p_or_n is '1':
@@ -78,7 +90,10 @@ fout.write("""<html>
 
 itemcount = 0
 outcount = 0
+max_outcount = 100
 for key, val in meta.iteritems():
+    if len(val["P"]) == 0:
+        continue
     if random.random() > 0.9:
     #if itemcount % 1 == 0:
         line = "<tr><td class='td_anchor'><img class='img_anchor' src='{}{}'></td>".format(image_baseurl, key)
@@ -92,7 +107,7 @@ for key, val in meta.iteritems():
         fout.write(line)
         outcount += 1
 
-        if outcount > 10:
+        if outcount > max_outcount:
             break
     itemcount += 1
 fout.write('</table></body></html>\n')
