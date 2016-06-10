@@ -25,7 +25,8 @@ projectlist = { {project='distance_pair_128_att_0411', linestyle='-'},
         {project='distance_pair_128_0531_MonMay3009:57:142016_epoch117', linestyle='-'},
         {project='distance_pair_128_0531_MonMay3009:57:142016_epoch397', linestyle='-'},
         {project='distance_pair_128_0607_TueMay3113:40:102016_epoch892', linestyle='-'},
-        {project='distance_pair_128_0607_MonMay3018:07:222016_epoch948', linestyle='-'}
+        {project='distance_pair_128_0607_MonMay3018:07:222016_epoch948', linestyle='-'},
+        {project='distance_pair_128_0609_MonMay3018:07:222016_epoch73021', linestyle='-'}
 
     }
 

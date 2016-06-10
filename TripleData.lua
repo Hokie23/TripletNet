@@ -376,9 +376,9 @@ function LoadDataFashion(filepath, check_imagefile)
         --print (label_pairs)
         --debugger.enter()
         m = label_pairs[i]
-        local a_name = m[1]
-        local t_name = m[2]
-        local p_or_n = m[3]
+        local a_name = m[2]
+        local t_name = m[3]
+        local p_or_n = m[4]
         local bcontinue = false
 
         local cond = (function() 

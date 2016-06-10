@@ -3,6 +3,8 @@ require 'image'
 require 'math'
 require 'preprocess'
 
+local debugger = require 'fb.debugger'
+
 local opt = opt or {}
 local PreProcDir = opt.preProcDir or './'
 local DataPath = opt.datapath or '/data1/fantajeon/torch/TripletNet/'
@@ -36,14 +38,13 @@ function LoadData(filepath)
     local anchor_name_to_idx = {}
     local anchor_name_list = {}
     local anchor_count = 0
-    local category_name = {}
     local ImagePool = {}
     local count_imagepool = 0
     local ImagePoolByName = {}
 
     label_pairs = csvigo.load( {path=DataPath .. filepath, mode='large'} )
     for i=1,#label_pairs do
-    --for i=1,#label_pairs,1000 do
+    --for i=1,#label_pairs,10000 do
         m = label_pairs[i]
         local category = m[1]
         local a_name = m[2]
@@ -82,16 +83,14 @@ function LoadData(filepath)
             end
             if p_or_n == '1' then
                 if positive_pairs[a_name] == nil then
-                    positive_pairs[a_name] = {{t_name, category_name}}
-                else
-                    table.insert(positive_pairs[a_name], {t_name, category_name} )
+                    positive_pairs[a_name] = {}
                 end
+                table.insert(positive_pairs[a_name], {name=t_name, cat=category} )
             else 
                 if negative_pairs[a_name] == nil then
-                    negative_pairs[a_name] = {{t_name, category_name}}
-                else
-                    table.insert(negative_pairs[a_name], {t_name, category_name} )
+                    negative_pairs[a_name] = {}
                 end
+                table.insert(negative_pairs[a_name], {name=t_name, cat=category} )
             end
             return "ok"
         end)()
@@ -168,15 +167,17 @@ function write_csv(Data, path)
     for i=1,#Data.data.anchor_name_list do
         local anchor_name = Data.data.anchor_name_list[i]
         local pos_of_anchor = Data.data.positive[anchor_name]
+
+        --debugger.enter()
         for j=1,#pos_of_anchor do
-            local pair = {pos_of_anchor[j][2], anchor_name, pos_of_anchor[j][1], 1}
+            local pair = {pos_of_anchor[j].cat, anchor_name, pos_of_anchor[j].name, 1}
             table.insert(array, pair)
         end
 
         local neg_of_anchor = Data.data.negative[anchor_name]
         if neg_of_anchor ~= nil then
             for j=1,#neg_of_anchor do
-                local pair = {neg_of_anchor[j][2], anchor_name, neg_of_anchor[j], 0}
+                local pair = {neg_of_anchor[j].cat, anchor_name, neg_of_anchor[j].name, 0}
                 table.insert(array, pair)
             end
         end
